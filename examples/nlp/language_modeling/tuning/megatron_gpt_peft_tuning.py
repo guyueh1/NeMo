@@ -18,10 +18,14 @@ import tempfile
 
 import torch.multiprocessing as mp
 from omegaconf.omegaconf import OmegaConf, open_dict
-from pytorch_lightning import Trainer
+from pytorch_lightning import Trainer, LightningModule
 from pytorch_lightning.plugins.environments import TorchElasticEnvironment
 from pytorch_lightning.trainer.connectors.checkpoint_connector import CheckpointConnector
+from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader, Dataset
+import torch
+from torch._dynamo import disable, optimize
+import pytorch_lightning as pl
 
 from nemo.collections.nlp.models.language_modeling.megatron_gpt_peft_models import (
     MegatronGPTAdapterModel,
@@ -237,7 +241,9 @@ def main(cfg) -> None:
             save_restore_connector=save_restore_connector,
         )
     else:
-        raise RuntimeError("PEFT training needs a trained base model present.")
+        # allow random initialization for debugging
+        model = peft_cls(base_model_cfg, trainer=trainer)
+        # raise RuntimeError("PEFT training needs a trained base model present.")
 
     trainer.fit(model)
 

@@ -681,6 +681,14 @@ class ModelPT(LightningModule, Model):
             optimizer_args['lr'] = lr
 
         # Actually instantiate the optimizer
+        
+        import torch
+        curr_mem = torch.cuda.memory_allocated()
+        peak_mem = torch.cuda.max_memory_allocated()
+        torch.cuda.reset_peak_memory_stats()
+        logging.info(f"Before optimizer initialization the allocated memory: \n{curr_mem // 1024//1024} MBytes")
+        logging.info(f"Before optimizer initialization the peak memory: \n{peak_mem // 1024//1024} MBytes")
+        
         if optimizer_cls is not None:
             if inspect.isclass(optimizer_cls):
                 optimizer = optimizer_cls(self._optimizer_param_groups, **optimizer_args)
@@ -719,9 +727,16 @@ class ModelPT(LightningModule, Model):
             optimizer = optimizer(self._optimizer_param_groups, **optimizer_args)
 
             logging.info("Optimizer config = %s", str(optimizer))
+            logging.info("Optimizer args = %s", str(optimizer_args))
 
             self._optimizer = optimizer
 
+        curr_mem = torch.cuda.memory_allocated()
+        peak_mem = torch.cuda.max_memory_allocated()
+        torch.cuda.reset_peak_memory_stats()
+        logging.info(f"After optimizer initialization the allocated memory: \n{curr_mem // 1024//1024} MBytes")
+        logging.info(f"After optimizer initialization the peak memory: \n{peak_mem // 1024//1024} MBytes")
+            
         # Try to instantiate scheduler for optimizer
         self._scheduler = prepare_lr_scheduler(
             optimizer=self._optimizer, scheduler_config=scheduler_config, train_dataloader=self._train_dl

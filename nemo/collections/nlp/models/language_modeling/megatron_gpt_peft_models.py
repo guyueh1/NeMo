@@ -63,6 +63,13 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
                             name=peft_key, cfg=peft_cfg,
                         )
         logging.info(f"After adding PEFT params:\n{self.summarize()}")
+
+        import torch
+        curr_mem = torch.cuda.memory_allocated()
+        peak_mem = torch.cuda.max_memory_allocated()
+        torch.cuda.reset_peak_memory_stats()
+        logging.info(f"After adding PEFT params the allocated memory: \n{curr_mem // 1024//1024} MBytes")
+        logging.info(f"After adding PEFT params the peak memory: \n{peak_mem // 1024//1024} MBytes")
         return True
 
     def setup(self, stage=None):
@@ -80,6 +87,14 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
         """ 
         Gets the keys associated with the adapters only.
         """
+
+        # state_dict = self.model.state_dict(prefix='')
+        # peft_state_dict = {}
+        # for k in self.adapter_keys:
+        #     _k = k.split('module.')[-1]
+        #     print(f"self.adapter_keys: {_k}")
+        #     peft_state_dict[k] = state_dict[_k]
+
         state_dict = self.model.state_dict(prefix="model.")
         peft_state_dict = {}
         for k in self.adapter_keys:
@@ -120,11 +135,17 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
         """
         self.freeze()  # Freeze the entire model
         opt_params = []
-        for _, module in self.named_modules():
+        for name, module in self.named_modules():
             if isinstance(module, adapter_mixins.AdapterModuleMixin) and module.is_adapter_available():
                 module.set_enabled_adapters(enabled=True)
                 module.unfreeze_enabled_adapters()  # selectively unfreeze the adapter modules.
-                opt_params += [p for p in module.parameters()]
+
+                for pn, p in module.named_parameters():
+                    if p.requires_grad:
+                        opt_params.append(p)
+                        logging.info(f"Adding module {name}, {pn} to opt_param group")
+                # opt_params += [p for p in module.parameters()]
+                # logging.info(f"Adding module {name} to opt_param group")
 
         self._optimizer_param_groups = ({"params": opt_params},)
         logging.info(f"Optimizer groups set:\n{self.summarize()}")
