@@ -387,6 +387,8 @@ class MegatronGPTLoRAModel(MegatronGPTPEFTModel):
             row_init_method=lora_cfg.get("row_init_method", "zero"),
             gather_output=False,
             dropout=lora_cfg.adapter_dropout,
+            precision=cfg.precision,
+            megatron_amp_O2=cfg.megatron_amp_O2,
         )
 
         self.name_key_to_cfg = {}

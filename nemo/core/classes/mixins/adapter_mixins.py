@@ -414,6 +414,7 @@ class AdapterModuleMixin(ABC):
 
                         # Recursively set grad required for submodules
                         for pname, param in module.adapter_layer[name].named_parameters():
+                            logging.info(f"set requires_grad_ to True for {pname} in module.adapter_layer[{name}]")
                             param.requires_grad_(True)
 
                         # unfreeze batch norm if any in the adapter submodules

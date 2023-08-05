@@ -591,6 +591,12 @@ class MegatronGPTModel(MegatronBaseModel, TextGeneration):
 
         loss_mean = self.fwd_bwd_step(dataloader_iter, batch_idx, False)
 
+        fw_bw_mem = torch.cuda.memory_allocated()
+        fw_bw_peak_mem = torch.cuda.max_memory_allocated()
+        # torch.cuda.reset_peak_memory_stats()
+        logging.info(f"after fwd_bwd_step of training_step(batch_idx={batch_idx}), memory: {fw_bw_mem//1024//1024} MBytes")
+        logging.info(f"after fwd_bwd_step of training_step(batch_idx={batch_idx}), peak: {fw_bw_peak_mem//1024//1024} MBytes")
+
         # when using sequence parallelism, the sequence parallel layernorm grads must be all-reduced
         if self.cfg.get('tensor_model_parallel_size', 1) > 1 and self.cfg.get('sequence_parallel', False):
             self.allreduce_sequence_parallel_gradients()
