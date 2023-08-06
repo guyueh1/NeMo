@@ -38,6 +38,7 @@ from nemo.collections.nlp.modules.common.megatron.utils import (
 )
 from nemo.collections.nlp.parts import utils_funcs
 from nemo.core import adapter_mixins
+from nemo.utils import logging
 
 try:
     from apex.transformer.enums import AttnMaskType, AttnType
@@ -405,11 +406,22 @@ class ParallelAttention(MegatronModule, adapter_mixins.AdapterModuleMixin):
         if self.attention_type == AttnType.self_attn:
             # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
             mixed_x_layer, _ = self.query_key_value(hidden_states)
-            if self.is_adapter_available():
-                lora_kqv_adapter = self.get_adapter_module(AdapterName.LORA_KQV_ADAPTER)
-                if lora_kqv_adapter:
-                    lora_mixed_x_layer = lora_kqv_adapter(hidden_states)
-                    mixed_x_layer = mixed_x_layer + lora_mixed_x_layer
+
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After query_key_value: {mem//1024} GB {mem%1024} MB")
+
+            # if self.is_adapter_available():
+            #     lora_kqv_adapter = self.get_adapter_module(AdapterName.LORA_KQV_ADAPTER)
+            #     if lora_kqv_adapter:
+            #         lora_mixed_x_layer = lora_kqv_adapter(hidden_states)
+            #         mixed_x_layer = mixed_x_layer + lora_mixed_x_layer
+
+            if self.use_lora_kqv_adapter:
+                lora_mixed_x_layer = self.lora_kqv_adapter(hidden_states)
+                mixed_x_layer = mixed_x_layer + lora_mixed_x_layer
+
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After LORA_KQV_ADAPTER: {mem//1024} GB {mem%1024} MB")
 
             # [sq, b, (np * 3 * hn)] --> [sq, b, np, 3 * hn]
             new_tensor_shape = mixed_x_layer.size()[:-1] + (
@@ -424,6 +436,10 @@ class ParallelAttention(MegatronModule, adapter_mixins.AdapterModuleMixin):
             (query_layer, key_layer, value_layer) = tensor_parallel.split_tensor_along_last_dim(
                 mixed_x_layer, 3, contiguous_split_chunks=True
             )
+
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After split_tensor_along_last_dim: {mem//1024} GB {mem%1024} MB")
+
         else:
             # Attention heads [sk, b, h] --> [sk, b, (np * 2 * hn)]
             mixed_kv_layer, _ = self.key_value(encoder_output)
@@ -472,6 +488,9 @@ class ParallelAttention(MegatronModule, adapter_mixins.AdapterModuleMixin):
                 assert key_infused_adapter is not None, "Expected key_infused_adapter not found!"
                 vls = value_layer.shape
                 value_layer = value_infused_adapter(value_layer.reshape(vls[0], vls[1], -1)).reshape(vls)
+            
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After infused_key_value_adapter: {mem//1024} GB {mem%1024} MB")
 
         # ===================================================
         # Adjust key, value, and attention mask for inference
@@ -536,6 +555,9 @@ class ParallelAttention(MegatronModule, adapter_mixins.AdapterModuleMixin):
                 relative_position_bias=relative_position_bias,
                 headscale_tensor=self.head_scale_tensor if self.headscale else None,
             )
+            
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After core_attention: {mem//1024} GB {mem%1024} MB")
 
         # =================
         # Output. [sq, b, h]
@@ -545,6 +567,9 @@ class ParallelAttention(MegatronModule, adapter_mixins.AdapterModuleMixin):
 
         if get_key_value:
             output = [output, present]
+
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After attn_output: {mem//1024} GB {mem%1024} MB")
 
         return output, bias
 

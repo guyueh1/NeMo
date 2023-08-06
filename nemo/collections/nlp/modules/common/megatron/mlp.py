@@ -28,6 +28,7 @@ from nemo.collections.nlp.modules.common.megatron.utils import ApexGuardDefaults
 from nemo.collections.nlp.modules.common.megatron.utils import openai_gelu as openai_gelu_func
 from nemo.collections.nlp.modules.common.megatron.utils import squared_relu
 from nemo.core import adapter_mixins
+from nemo.utils import logging
 
 try:
     from apex.normalization import MixedFusedRMSNorm
@@ -227,6 +228,10 @@ class ParallelMLP(MegatronModule, adapter_mixins.AdapterModuleMixin):
         # [s, b, 4hp]
         intermediate_parallel, bias_parallel = self.dense_h_to_4h(hidden_states)
 
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After dense_h_to_4h: {mem//1024} GB {mem%1024} MB")
+
+        
         if self.fast_glu_activation:
             intermediate_parallel, intermediate_parallel_2 = torch.chunk(intermediate_parallel, 2, dim=-1)
             if bias_parallel is not None:
@@ -256,12 +261,22 @@ class ParallelMLP(MegatronModule, adapter_mixins.AdapterModuleMixin):
             else:
                 intermediate_parallel = self.activation_func(intermediate_parallel)
 
+
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After activation_func: {mem//1024} GB {mem%1024} MB")
+
         if self.dropout > 0:
             intermediate_parallel = F.dropout(intermediate_parallel, p=self.dropout, training=self.training)
+
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After dropout: {mem//1024} GB {mem%1024} MB")
 
         infused_adapter = self.get_adapter_module(AdapterName.MLP_INFUSED)
         if infused_adapter:
             intermediate_parallel = infused_adapter(intermediate_parallel)
+
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After MLP_INFUSED: {mem//1024} GB {mem%1024} MB")
 
         # Normformer normalization
         if self.transformer_block_type == 'normformer':
@@ -269,6 +284,10 @@ class ParallelMLP(MegatronModule, adapter_mixins.AdapterModuleMixin):
 
         # [s, b, h]
         output, output_bias = self.dense_4h_to_h(intermediate_parallel)
+
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After dense_4h_to_h: {mem//1024} GB {mem%1024} MB")
+
         return output, output_bias
 
 

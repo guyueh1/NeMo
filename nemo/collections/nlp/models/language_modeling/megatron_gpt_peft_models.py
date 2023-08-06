@@ -40,12 +40,23 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
         self.base_keys = self.get_all_keys()
         self.init_peft_modules()
         self.adapter_keys = self.get_all_keys() - self.base_keys
+        self.process_peft_modules()
 
     def first_stage_of_pipeline(self):
         if hasattr(self, "model") and hasattr(self.model, "pre_process"):
             return self.model.pre_process
         logging.warning("no attribute named model or no model.pre_process found. Can not detect stage of pipeline...")
         return False
+
+    def process_peft_modules(self):
+        logging.info(f"Process PEFT modules:\n")
+        for _, module in self.named_modules():
+            if isinstance(module, adapter_mixins.AdapterModuleMixin):
+                # a hack to work around torch compiler graph break on dict[str,nn.Module]
+                module.lora_kqv_adapter = module.get_adapter_module(AdapterName.LORA_KQV_ADAPTER)
+                module.use_lora_kqv_adapter = module.is_adapter_available() and (module.lora_kqv_adapter != None)
+                logging.info(f"Processing module {module}")
+
 
     def init_peft_modules(self):
         """ 

@@ -506,11 +506,17 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
             # Post-LN: x -> MHA -> Residual -> LN -> MLP -> Residual -> LN
             # Normformer: x -> LN -> MHA -> LN -> Residual -> MLP (w/LN) -> Residual
 
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"Before everything: {mem//1024} GB {mem%1024} MB")
+
             residual = hidden_states
             # Layer norm at the beginning of the transformer layer.
             if self.transformer_block_type in ['pre_ln', 'normformer']:
                 hidden_states = self.input_layernorm(hidden_states)
 
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After input_layernorm: {mem//1024} GB {mem%1024} MB")
+            
             attention_output, attention_bias = self.self_attention(
                 hidden_states,
                 attention_mask,
@@ -522,6 +528,10 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
                 relative_position_bias=self_attention_relative_position_bias,
                 checkpoint_core_attention=checkpoint_core_attention,
             )
+
+
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After self_attention: {mem//1024} GB {mem%1024} MB")
 
             if get_key_value:
                 attention_output, presents = attention_output
@@ -535,6 +545,7 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
                 attention_output = self.post_attention_normformer_norm(attention_output)
                 attention_bias = None
 
+            
             # jit scripting for a nn.module (with dropout) is not
             # trigerring the fusion kernel. For now, we use two
             # different nn.functional routines to account for varying
@@ -543,9 +554,13 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
             bias_dropout_add_func = self._get_bias_droput_add_func(
                 transformer_block_type=self.transformer_block_type, position_after='attention'
             )
+            
             if attention_bias is not None:
                 attention_bias = attention_bias.expand_as(residual)
 
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After attention_bias: {mem//1024} GB {mem%1024} MB")
+            
             if self.is_adapter_available():
                 adapter_1 = self.get_adapter_module(AdapterName.PRE_ATTN_ADAPTER)
                 if adapter_1:
@@ -553,9 +568,15 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
                         adapter_1(attention_output) + attention_output
                     )  # simple adapter call with residual connection
 
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After adapter: {mem//1024} GB {mem%1024} MB")
+            
             layernorm_input = bias_dropout_add_func(attention_output, attention_bias, residual, self.hidden_dropout)
             # print(f"Layer: {self.layer_number} Attention checksum {layernorm_input.sum()}")
 
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After post attention bias_dropout_add_func: {mem//1024} GB {mem%1024} MB")
+            
             # Post-LN normalization after residual
             if self.transformer_block_type == 'post_ln':
                 normalization_output = self.input_layernorm(layernorm_input)
@@ -563,6 +584,10 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
             elif self.transformer_block_type in ['pre_ln', 'normformer']:
                 # Layer norm post the self attention.
                 normalization_output = self.post_attention_layernorm(layernorm_input)
+
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After Post-LN normalization: {mem//1024} GB {mem%1024} MB")
+
         else:
             layernorm_input, normalization_output = hidden_states
 
@@ -620,14 +645,24 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
             # Post-LN normalization after residual
             if self.transformer_block_type == 'post_ln':
                 layernorm_input = normalization_output
+
+            mem = torch.cuda.memory_allocated() // 1024
+            logging.info(f"After cross_attention: {mem//1024} GB {mem%1024} MB")
         # MLP.
         mlp_output, mlp_bias = self.mlp(normalization_output)
+
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After mlp: {mem//1024} GB {mem%1024} MB")
+
         if self.is_adapter_available():
             # TODO: (@adithyre) was able to move adapter_2 back to the end of the transformer after ptl 1.7 update.
             adapter_2 = self.get_adapter_module(AdapterName.POST_ATTN_ADAPTER)
             if adapter_2:
                 mlp_output = adapter_2(mlp_output) + mlp_output  # simple adapter call with residual connection
 
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After POST_ATTN_ADAPTER: {mem//1024} GB {mem%1024} MB")
+        
         residual = layernorm_input
 
         bias_dropout_add_func = self._get_bias_droput_add_func(
@@ -637,12 +672,18 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
         output = bias_dropout_add_func(mlp_output, mlp_bias, residual, self.hidden_dropout)
         # print(f"Layer: {self.layer_number} MLP + Dropout + Residual checksum {output.sum()}")
 
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After post mlp bias_dropout_add_func: {mem//1024} GB {mem%1024} MB")
+
         if self.transformer_block_type == 'post_ln':
             output = self.post_attention_layernorm(output)
 
         if get_key_value:
             output = [output, presents]
 
+        mem = torch.cuda.memory_allocated() // 1024
+        logging.info(f"After post mlp layernorm: {mem//1024} GB {mem%1024} MB")
+        
         return output
 
 
@@ -1505,6 +1546,9 @@ class ParallelTransformer(MegatronModule):
                             self.inference_params.sequence_len_offset = self.inference_current_sequence_len
 
                     for index in range(self.num_layers):
+
+                        logging.info(f"Layer {index}:")
+
                         layer = self._get_layer(index)
                         past = None
 
