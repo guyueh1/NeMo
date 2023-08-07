@@ -280,7 +280,10 @@ def main(cfg) -> None:
         # model.model.language_model.encoder = \
         # torch.compile(model.model.language_model.encoder)
 
-        model.model.language_model = torch.compile(model.model.language_model)
+        if cfg.model.get("megatron_amp_O2", False):
+            model.model.module.language_model = torch.compile(model.model.module.language_model)
+        else:
+            model.model.language_model = torch.compile(model.model.language_model)
         
         # model.model = torch.compile(model.model)
     
