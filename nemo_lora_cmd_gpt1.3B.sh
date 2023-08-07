@@ -3,8 +3,9 @@ export PYTHONPATH=/home/scratch.guyueh_sw/2023su/NeMo:/home/scratch.guyueh_sw/20
 
 micro_batch=${1:-1}
 max_seq=${2:-2048}
-addon_args=${3:-""}
-logfile=${4:-"gpt1.3B_nemo_lora"}
+freeze_before_training=${3:-"False"}
+torch_compile=${4:-"False"}
+logfile=${5:-"gpt1.3B_nemo_lora"}
 
 python /home/scratch.guyueh_sw/2023su/NeMo/examples/nlp/language_modeling/tuning/megatron_gpt_peft_tuning.py \
 trainer.precision=bf16 \
@@ -21,5 +22,6 @@ model.data.train_ds.file_names=[/home/scratch.guyueh_sw/2023su/dataset/SQuAD/squ
 model.data.validation_ds.file_names=[/home/scratch.guyueh_sw/2023su/dataset/SQuAD/squad_val.jsonl] \
 model.peft.peft_scheme=lora \
 model.answer_only_loss=True \
-$addon_args \
-2>&1 | tee batch_${micro_batch}_${logfile}_${addon_args}.log
+++model.freeze_before_training=${freeze_before_training} \
+++model.torch_compile=${torch_compile} \
+2>&1 | tee batch_${micro_batch}_seq_${max_seq}_freeze_${freeze_before_training}_compile_${torch_compile}_${logfile}.log
