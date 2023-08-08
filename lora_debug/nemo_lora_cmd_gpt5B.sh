@@ -1,5 +1,5 @@
 export PATH=/usr/local/bin:$PATH
-export PYTHONPATH=/home/scratch.guyueh_sw/2023su/NeMo:/home/scratch.guyueh_sw/2023su/apex:/home/scratch.guyueh_sw/2023su/lightning/src:/home/scratch.guyueh_sw/2023su/Megatron-LM:$PYTHONPATH
+export PYTHONPATH=/home/scratch.guyueh_sw/2023su/NeMo:/home/scratch.guyueh_sw/2023su/apex:/home/scratch.guyueh_sw/2023su/lightning/src:/home/scratch.guyueh_sw/2023su/Megatron-LM-gitlab:$PYTHONPATH
 
 micro_batch=${1:-1}
 max_seq=${2:-2048}
@@ -22,6 +22,7 @@ model.data.train_ds.file_names=[/home/scratch.guyueh_sw/2023su/dataset/SQuAD/squ
 model.data.validation_ds.file_names=[/home/scratch.guyueh_sw/2023su/dataset/SQuAD/squad_val.jsonl] \
 model.peft.peft_scheme=lora \
 model.answer_only_loss=True \
+++model.use_flash_attention=True \
 ++model.freeze_before_training=${freeze_before_training} \
 ++model.torch_compile=${torch_compile} \
 2>&1 | tee batch_${micro_batch}_seq_${max_seq}_freeze_${freeze_before_training}_compile_${torch_compile}_${logfile}.log

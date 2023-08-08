@@ -102,6 +102,7 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         gpt_cfg.ffn_dropout = cfg.model.ffn_dropout
         gpt_cfg.peft = cfg.model.peft
         gpt_cfg.nsys_profile = cfg.model.get('nsys_profile', None)
+        gpt_cfg.use_flash_attention = cfg.model.get('use_flash_attention', False)
         peft_cls = _get_peft_scheme(cfg.model)
         gpt_cfg.target = f"{peft_cls.__module__}.{peft_cls.__name__}"
 

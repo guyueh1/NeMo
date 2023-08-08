@@ -180,3 +180,4 @@ examples/neural_graphs/*.yml
 nemo_experiments/
 
 torch_compile_debug/
+*.nsys-rep
