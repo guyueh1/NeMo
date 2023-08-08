@@ -550,12 +550,12 @@ class MegatronGPTModel(MegatronBaseModel, TextGeneration):
             The input batch to each micro-batch is fetched using the dataloader function
             in the micro-batch fwd function.
         """
-        torch.cuda.nvtx.range_push(f"step_batch_idx_{batch_idx}")
-        start_mem = torch.cuda.memory_allocated()
-        peak_mem = torch.cuda.max_memory_allocated()
-        # torch.cuda.reset_peak_memory_stats()
-        logging.info(f"on the start of training_step(batch_idx={batch_idx}), memory: {start_mem//1024//1024} MBytes")
-        logging.info(f"on the start of training_step(batch_idx={batch_idx}), peak: {peak_mem//1024//1024} MBytes")
+        # torch.cuda.nvtx.range_push(f"step_batch_idx_{batch_idx}")
+        # start_mem = torch.cuda.memory_allocated()
+        # peak_mem = torch.cuda.max_memory_allocated()
+        # # torch.cuda.reset_peak_memory_stats()
+        # logging.info(f"on the start of training_step(batch_idx={batch_idx}), memory: {start_mem//1024//1024} MBytes")
+        # logging.info(f"on the start of training_step(batch_idx={batch_idx}), peak: {peak_mem//1024//1024} MBytes")
 
         # Initialize userbuffer communicators.
         if self.initialize_ub:
@@ -591,11 +591,11 @@ class MegatronGPTModel(MegatronBaseModel, TextGeneration):
 
         loss_mean = self.fwd_bwd_step(dataloader_iter, batch_idx, False)
 
-        fw_bw_mem = torch.cuda.memory_allocated()
-        fw_bw_peak_mem = torch.cuda.max_memory_allocated()
-        # torch.cuda.reset_peak_memory_stats()
-        logging.info(f"after fwd_bwd_step of training_step(batch_idx={batch_idx}), memory: {fw_bw_mem//1024//1024} MBytes")
-        logging.info(f"after fwd_bwd_step of training_step(batch_idx={batch_idx}), peak: {fw_bw_peak_mem//1024//1024} MBytes")
+        # fw_bw_mem = torch.cuda.memory_allocated()
+        # fw_bw_peak_mem = torch.cuda.max_memory_allocated()
+        # # torch.cuda.reset_peak_memory_stats()
+        # logging.info(f"after fwd_bwd_step of training_step(batch_idx={batch_idx}), memory: {fw_bw_mem//1024//1024} MBytes")
+        # logging.info(f"after fwd_bwd_step of training_step(batch_idx={batch_idx}), peak: {fw_bw_peak_mem//1024//1024} MBytes")
 
         # when using sequence parallelism, the sequence parallel layernorm grads must be all-reduced
         if self.cfg.get('tensor_model_parallel_size', 1) > 1 and self.cfg.get('sequence_parallel', False):
@@ -656,12 +656,12 @@ class MegatronGPTModel(MegatronBaseModel, TextGeneration):
             self.log('global_batch_size', current_global_batch_size, prog_bar=True, rank_zero_only=True, batch_size=1)
             self.if_first_step = 1
 
-        torch.cuda.nvtx.range_pop()
-        end_mem = torch.cuda.memory_allocated()
-        peak_mem = torch.cuda.max_memory_allocated()
-        # torch.cuda.reset_peak_memory_stats()
-        logging.info(f"on the end of training_step(batch_idx={batch_idx}), memory: {end_mem//1024//1024} MBytes")
-        logging.info(f"on the end of training_step(batch_idx={batch_idx}), peak: {peak_mem//1024//1024} MBytes")
+        # torch.cuda.nvtx.range_pop()
+        # end_mem = torch.cuda.memory_allocated()
+        # peak_mem = torch.cuda.max_memory_allocated()
+        # # torch.cuda.reset_peak_memory_stats()
+        # logging.info(f"on the end of training_step(batch_idx={batch_idx}), memory: {end_mem//1024//1024} MBytes")
+        # logging.info(f"on the end of training_step(batch_idx={batch_idx}), peak: {peak_mem//1024//1024} MBytes")
 
         return loss_mean
 
