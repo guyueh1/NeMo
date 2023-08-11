@@ -17,7 +17,7 @@
 import enum
 import logging
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import torch
 import torch.nn as nn
@@ -29,6 +29,7 @@ from nemo.collections.nlp.modules.common.megatron.fused_bias_gelu import fused_b
 from nemo.collections.nlp.modules.common.megatron.utils import init_method_const, init_method_normal
 from nemo.collections.nlp.modules.common.prompt_encoder import InferenceTable
 from nemo.core.classes.mixins import adapter_mixin_strategies
+from nemo.collections.nlp.parts import utils_funcs
 
 try:
     from apex.normalization.fused_layer_norm import MixedFusedLayerNorm
@@ -110,6 +111,8 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         row_init_method: str = 'zero',  # TODO: (@adithyare) should rename this to output_init_method to be more precise.
         gather_output: bool = True,
         dropout: float = 0.0,
+        base_model_precision: Union[str, int] = 32,
+        megatron_amp_O2: Optional[bool] = None,
     ):
         super().__init__()
         if not HAVE_APEX:
@@ -121,18 +124,39 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         self.activation = activation_registry[activation]()
         self.norm_position = norm_position
 
+        self.model_parallel_config = self._build_model_parallel_config()
+
+        self.dtype = utils_funcs.dtype_from_precision(base_model_precision, megatron_amp_O2)
+
         self.linear_in = ColumnParallelLinear(
-            in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method)
+            in_features,
+            dim,
+            config=self.model_parallel_config,
+            bias=False,
+            gather_output=True,
+            init_method=self._get_init_fn(column_init_method),
+            params_dtype=self.dtype,
         )
         if gather_output:
             self.linear_out = RowParallelLinear(
-                dim, out_features, bias=False, init_method=self._get_init_fn(row_init_method)
+                dim,
+                out_features,
+                config=self.model_parallel_config,
+                bias=False,
+                init_method=self._get_init_fn(row_init_method),
+                params_dtype=self.dtype,
             )
         else:
             # (@adithyare) we use this option to mirror the behavior a column parallel layer with two low-rank column parallel layers
             # if the original column parallel layer uses gather_output=False, then we will use the self.liner_out layer defined below.
             self.linear_out = ColumnParallelLinear(
-                dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method)
+                dim,
+                out_features,
+                config=self.model_parallel_config,
+                bias=False,
+                gather_output=False,
+                init_method=self._get_init_fn(row_init_method),
+                params_dtype=self.dtype,
             )
 
         if self.norm_position in ["pre", "post"]:
@@ -193,6 +217,8 @@ class ParallelLinearAdapterConfig:
     row_init_method: str = 'zero'
     gather_output: bool = True
     dropout: float = 0.0
+    base_model_precision: Union[str, int] = 32
+    megatron_amp_O2: Optional[bool] = None
     _target_: str = "{0}.{1}".format(ParallelLinearAdapter.__module__, ParallelLinearAdapter.__name__)
 
 
