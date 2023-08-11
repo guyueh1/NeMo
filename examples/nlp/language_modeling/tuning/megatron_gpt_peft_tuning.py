@@ -230,12 +230,14 @@ def main(cfg) -> None:
         if os.path.isdir(cfg.model.restore_from_path):
             save_restore_connector.model_extracted_dir = cfg.model.restore_from_path
         peft_cls = _get_peft_scheme(cfg.model)
-        model = peft_cls.restore_from(
-            restore_path=cfg.model.restore_from_path,
-            trainer=trainer,
-            override_config_path=base_model_cfg,
-            save_restore_connector=save_restore_connector,
-        )
+
+        model = peft_cls(base_model_cfg, trainer)
+        # model = peft_cls.restore_from(
+        #     restore_path=cfg.model.restore_from_path,
+        #     trainer=trainer,
+        #     override_config_path=base_model_cfg,
+        #     save_restore_connector=save_restore_connector,
+        # )
     else:
         raise RuntimeError("PEFT training needs a trained base model present.")
 
