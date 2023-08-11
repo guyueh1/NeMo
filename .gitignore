@@ -179,3 +179,5 @@ examples/neural_graphs/*.yml
 .hydra/
 nemo_experiments/
 
+*.nsys-rep
+*/torch_compile_debug/

@@ -1692,6 +1692,8 @@ class ModelPT(LightningModule, Model):
                     if batch_idx == self._nsys_profile_end_step and get_rank() in self._nsys_profile_ranks:
                         logging.info("====== End nsys profiling ======")
                         torch.cuda.cudart().cudaProfilerStop()
+                        peak_mem = torch.cuda.max_memory_allocated() // 1024 // 1024
+                        logging.info(f"Peak GPU memory: {peak_mem} MB")
 
     def on_train_end(self):
         """ PyTorch Lightning hook:

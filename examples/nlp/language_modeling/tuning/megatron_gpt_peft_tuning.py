@@ -18,10 +18,14 @@ import tempfile
 
 import torch.multiprocessing as mp
 from omegaconf.omegaconf import OmegaConf, open_dict
-from pytorch_lightning import Trainer
+from pytorch_lightning import Trainer, LightningModule
 from pytorch_lightning.plugins.environments import TorchElasticEnvironment
 from pytorch_lightning.trainer.connectors.checkpoint_connector import CheckpointConnector
+from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader, Dataset
+import torch
+from torch._dynamo import disable, optimize
+import pytorch_lightning as pl
 
 from nemo.collections.nlp.models.language_modeling.megatron_gpt_peft_models import (
     MegatronGPTAdapterModel,
@@ -97,6 +101,8 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         gpt_cfg.attention_dropout = cfg.model.get('attention_dropout', 0.0)
         gpt_cfg.ffn_dropout = cfg.model.ffn_dropout
         gpt_cfg.peft = cfg.model.peft
+        gpt_cfg.nsys_profile = cfg.model.get('nsys_profile', None)
+        gpt_cfg.use_flash_attention = cfg.model.get('use_flash_attention', False)
         peft_cls = _get_peft_scheme(cfg.model)
         gpt_cfg.target = f"{peft_cls.__module__}.{peft_cls.__name__}"
 
@@ -199,6 +205,23 @@ def main(cfg) -> None:
         plugins.append(TorchElasticEnvironment())
 
     trainer = Trainer(plugins=plugins, strategy=strategy, **cfg.trainer)
+
+    # Freeze before training, fixing the memory allocation issue
+    class FreezeBeforeTrainingCallback(Callback):
+        def freeze_before_training(self, pl_module: LightningModule):
+            if hasattr(pl_module, 'setup_optimizer_param_groups') and callable(getattr(pl_module, 'setup_optimizer_param_groups')):
+                pl_module.setup_optimizer_param_groups()
+                logging.info(f"FreezeBeforeTrainingCallback invokes setup_optimizer_param_groups() for {pl_module}")
+
+            else:
+                logging.info(f"FreezeBeforeTrainingCallback finds no setup_optimizer_param_groups() for {pl_module}")
+        def setup(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", stage: str) -> None:
+            self.freeze_before_training(pl_module)
+
+    # add a hook to freeze before training to reduce memory consumption
+    if cfg.model.get("freeze_before_training", False):
+        trainer.callbacks.append(FreezeBeforeTrainingCallback())
+
     exp_manager(trainer, cfg.exp_manager)
     # update resume from checkpoint found by exp_manager
     if cfg.model.resume_from_checkpoint is not None:
@@ -223,6 +246,9 @@ def main(cfg) -> None:
             return_config=True,
             save_restore_connector=base_model_save_restore_connector,
         )
+        
+        print(base_model_cfg)
+        
         base_model_cfg = _modify_config(base_model_cfg, cfg, add_cfg_to_tree=False)
         save_restore_connector = PEFTSaveRestoreConnector(
             peft_model_nemo_path=cfg.model.peft.restore_from_path, peft_model_ckpt_path=resume_from_checkpoint
@@ -231,6 +257,10 @@ def main(cfg) -> None:
             save_restore_connector.model_extracted_dir = cfg.model.restore_from_path
         peft_cls = _get_peft_scheme(cfg.model)
 
+
+        print(cfg)
+        print(base_model_cfg)
+        
         model = peft_cls(base_model_cfg, trainer)
         # model = peft_cls.restore_from(
         #     restore_path=cfg.model.restore_from_path,
@@ -241,6 +271,9 @@ def main(cfg) -> None:
     else:
         raise RuntimeError("PEFT training needs a trained base model present.")
 
+    if cfg.model.get('torch_compile', False):
+        model.model.language_model = torch.compile(model.model.language_model)
+        
     trainer.fit(model)
 
 
