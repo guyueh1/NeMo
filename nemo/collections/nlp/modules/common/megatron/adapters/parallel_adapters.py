@@ -199,7 +199,7 @@ class ParallelLinearAdapterConfig:
     gather_output: bool = True
     dropout: float = 0.0
     base_model_precision: Union[str, int] = 32
-    megatron_amp_O2: Optional[bool]
+    megatron_amp_O2: Optional[bool] = None
     _target_: str = "{0}.{1}".format(ParallelLinearAdapter.__module__, ParallelLinearAdapter.__name__)
 
 
