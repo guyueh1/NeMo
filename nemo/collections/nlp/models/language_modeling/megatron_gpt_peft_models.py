@@ -38,6 +38,7 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
         super().__init__(cfg, trainer)
         self.setup_complete = False
         self.base_keys = self.get_all_keys()
+        self.freeze()
         self.init_peft_modules()
         self.adapter_keys = self.get_all_keys() - self.base_keys
 
@@ -366,6 +367,8 @@ class MegatronGPTLoRAModel(MegatronGPTPEFTModel):
             row_init_method=lora_cfg.get("row_init_method", "zero"),
             gather_output=False,
             dropout=lora_cfg.adapter_dropout,
+            sequence_parallel_enabled=cfg.get("sequence_parallel", False),
+            async_tensor_model_parallel_allreduce=(not cfg.get("sequence_parallel", False)),
         )
 
         self.name_key_to_cfg = {}
