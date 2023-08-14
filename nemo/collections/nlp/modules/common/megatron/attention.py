@@ -404,7 +404,9 @@ class ParallelAttention(MegatronModule, adapter_mixins.AdapterModuleMixin):
 
         if self.attention_type == AttnType.self_attn:
             # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
+            print("Before qkv hidden states shape", hidden_states.shape)
             mixed_x_layer, _ = self.query_key_value(hidden_states)
+            print("Mixed_x_layer shape", mixed_x_layer.shape)
             if self.is_adapter_available():
                 lora_kqv_adapter = self.get_adapter_module(AdapterName.LORA_KQV_ADAPTER)
                 if lora_kqv_adapter:

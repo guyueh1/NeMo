@@ -110,6 +110,8 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         row_init_method: str = 'zero',  # TODO: (@adithyare) should rename this to output_init_method to be more precise.
         gather_output: bool = True,
         dropout: float = 0.0,
+        sequence_parallel_enabled = False,
+        async_tensor_model_parallel_allreduce = True,
     ):
         super().__init__()
         if not HAVE_APEX:
@@ -121,19 +123,27 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         self.activation = activation_registry[activation]()
         self.norm_position = norm_position
 
-        self.linear_in = ColumnParallelLinear(
-            in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method)
-        )
-        if gather_output:
-            self.linear_out = RowParallelLinear(
-                dim, out_features, bias=False, init_method=self._get_init_fn(row_init_method)
+        if sequence_parallel_enabled:
+            self.linear_in = ColumnParallelLinear(
+                in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method), sequence_parallel_enabled=True, async_tensor_model_parallel_allreduce=False
+            )
+            self.linear_out = ColumnParallelLinear(
+                dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method), sequence_parallel_enabled=False
             )
         else:
-            # (@adithyare) we use this option to mirror the behavior a column parallel layer with two low-rank column parallel layers
-            # if the original column parallel layer uses gather_output=False, then we will use the self.liner_out layer defined below.
-            self.linear_out = ColumnParallelLinear(
-                dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method)
+            self.linear_in = ColumnParallelLinear(
+                in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method), sequence_parallel_enabled=sequence_parallel_enabled
             )
+            if gather_output:
+                self.linear_out = RowParallelLinear(
+                    dim, out_features, bias=False, init_method=self._get_init_fn(row_init_method)
+                )
+            else:
+                # (@adithyare) we use this option to mirror the behavior a column parallel layer with two low-rank column parallel layers
+                # if the original column parallel layer uses gather_output=False, then we will use the self.liner_out layer defined below.
+                self.linear_out = ColumnParallelLinear(
+                    dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method), sequence_parallel_enabled=sequence_parallel_enabled
+                )
 
         if self.norm_position in ["pre", "post"]:
             ln_features = in_features if self.norm_position == "pre" else out_features
@@ -169,8 +179,10 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
             x = self.layer_norm(x)
 
         x, _ = self.linear_in(x)  # (@adithyare) ColumnLinear returns output and bias, we are ignoring the bias term.
+        print("After LoRA A shape", x.shape)
         x = self.activation(x)
         x, _ = self.linear_out(x)
+        print("After LoRA B shape", x.shape)
         if self.norm_position == 'post':
             x = self.layer_norm(x)
 
@@ -193,6 +205,8 @@ class ParallelLinearAdapterConfig:
     row_init_method: str = 'zero'
     gather_output: bool = True
     dropout: float = 0.0
+    sequence_parallel_enabled: bool = False
+    async_tensor_model_parallel_allreduce: bool = True
     _target_: str = "{0}.{1}".format(ParallelLinearAdapter.__module__, ParallelLinearAdapter.__name__)
 
 
