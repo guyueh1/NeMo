@@ -12,7 +12,6 @@ sp=${2:-"False"}
 micro_batch=${3:-4}
 global_batch=128
 max_seq=${4:-2048}
-logfile=${5:-"dp_gpt_1.3B_nemo_lora"}
 version=$(git -C ${MLM} rev-parse HEAD)
 
 if [ $tp == 2 ]

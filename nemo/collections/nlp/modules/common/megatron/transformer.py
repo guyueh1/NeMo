@@ -42,6 +42,7 @@ from nemo.collections.nlp.modules.common.megatron.utils import ApexGuardDefaults
 from nemo.collections.nlp.parts import utils_funcs
 from nemo.core import adapter_mixins
 from nemo.utils import logging
+from nemo.utils.get_rank import get_rank
 
 try:
     from apex.normalization import MixedFusedRMSNorm
@@ -635,7 +636,7 @@ class ParallelTransformerLayer_(MegatronModule, adapter_mixins.AdapterModuleMixi
         )
 
         output = bias_dropout_add_func(mlp_output, mlp_bias, residual, self.hidden_dropout)
-        # print(f"Layer: {self.layer_number} MLP + Dropout + Residual checksum {output.sum()}")
+        print(f"Rank {get_rank()} Layer: {self.layer_number} MLP + Dropout + Residual checksum {output.sum()}")
 
         if self.transformer_block_type == 'post_ln':
             output = self.post_attention_layernorm(output)
