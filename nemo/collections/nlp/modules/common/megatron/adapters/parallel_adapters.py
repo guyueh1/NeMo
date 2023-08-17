@@ -124,6 +124,8 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         self.activation = activation_registry[activation]()
         self.norm_position = norm_position
 
+        self.dtype = utils_funcs.dtype_from_precision(base_model_precision, megatron_amp_O2)
+
         self.linear_in = ColumnParallelLinear(
             in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method), params_dtype=self.dtype
         )
