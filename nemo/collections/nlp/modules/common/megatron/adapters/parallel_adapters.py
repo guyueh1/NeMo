@@ -40,7 +40,7 @@ except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
 try:
-    from megatron.core.tensor_parallel import ColumnParallelLinear, RowParallelLinear
+    from megatron.core.tensor_parallel import ColumnParallelLinear, RowParallelLinear, gather_from_tensor_model_parallel_region
 
     HAVE_MEGATRON_CORE = True
 
@@ -110,6 +110,7 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         row_init_method: str = 'zero',  # TODO: (@adithyare) should rename this to output_init_method to be more precise.
         gather_output: bool = True,
         dropout: float = 0.0,
+        sequence_parallel_enabled: bool = False
     ):
         super().__init__()
         if not HAVE_APEX:
@@ -120,6 +121,17 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
             raise RuntimeError("ParallelLinearAdapter can not run without Megatron-core.")
         self.activation = activation_registry[activation]()
         self.norm_position = norm_position
+
+        self.sequence_parallel_enabled = sequence_parallel_enabled
+        if sequence_parallel_enabled:
+            # [s/tp, b, h] -> [s, b, r/tp]
+            self.linear_in = ColumnParallelLinear(in_features, dim, bias=False, gather_output=False, init_method=self._get_init_fn(column_init_method), sequence_parallel_enabled=True)
+            # [s, b, r/tp] -> [s, b, r]
+            self.allgather_between_two_linears_func = gather_from_tensor_model_parallel_region
+            # [s, b, r] -> [s, b, h/tp]
+            self.linear_out = ColumnParallelLinear(
+                dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method), sequence_parallel_enabled=False
+            )
 
         self.linear_in = ColumnParallelLinear(
             in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method)
@@ -169,6 +181,8 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
             x = self.layer_norm(x)
 
         x, _ = self.linear_in(x)  # (@adithyare) ColumnLinear returns output and bias, we are ignoring the bias term.
+        if self.sequence_parallel_enabled:
+            x = self.allgather_between_two_linears_func(x)
         x = self.activation(x)
         x, _ = self.linear_out(x)
         if self.norm_position == 'post':
@@ -193,6 +207,7 @@ class ParallelLinearAdapterConfig:
     row_init_method: str = 'zero'
     gather_output: bool = True
     dropout: float = 0.0
+    sequence_parallel_enabled: bool = False
     _target_: str = "{0}.{1}".format(ParallelLinearAdapter.__module__, ParallelLinearAdapter.__name__)
 
 
