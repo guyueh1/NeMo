@@ -366,6 +366,7 @@ class MegatronGPTLoRAModel(MegatronGPTPEFTModel):
             row_init_method=lora_cfg.get("row_init_method", "zero"),
             gather_output=False,
             dropout=lora_cfg.adapter_dropout,
+            sequence_parallel_enabled=cfg.sequence_parallel,
         )
 
         self.name_key_to_cfg = {}

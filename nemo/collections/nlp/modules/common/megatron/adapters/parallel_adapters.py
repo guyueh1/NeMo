@@ -125,27 +125,27 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         self.sequence_parallel_enabled = sequence_parallel_enabled
         if sequence_parallel_enabled:
             # [s/tp, b, h] -> [s, b, r/tp]
-            self.linear_in = ColumnParallelLinear(in_features, dim, bias=False, gather_output=False, init_method=self._get_init_fn(column_init_method), sequence_parallel_enabled=True)
+            self.linear_in = ColumnParallelLinear(in_features, dim, bias=False, gather_output=False, init_method=self._get_init_fn(column_init_method), async_tensor_model_parallel_allreduce=False, sequence_parallel_enabled=True)
             # [s, b, r/tp] -> [s, b, r]
             self.allgather_between_two_linears_func = gather_from_tensor_model_parallel_region
             # [s, b, r] -> [s, b, h/tp]
             self.linear_out = ColumnParallelLinear(
                 dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method), sequence_parallel_enabled=False
             )
-
-        self.linear_in = ColumnParallelLinear(
-            in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method)
-        )
-        if gather_output:
-            self.linear_out = RowParallelLinear(
-                dim, out_features, bias=False, init_method=self._get_init_fn(row_init_method)
-            )
         else:
-            # (@adithyare) we use this option to mirror the behavior a column parallel layer with two low-rank column parallel layers
-            # if the original column parallel layer uses gather_output=False, then we will use the self.liner_out layer defined below.
-            self.linear_out = ColumnParallelLinear(
-                dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method)
+            self.linear_in = ColumnParallelLinear(
+                in_features, dim, bias=False, gather_output=True, init_method=self._get_init_fn(column_init_method)
             )
+            if gather_output:
+                self.linear_out = RowParallelLinear(
+                    dim, out_features, bias=False, init_method=self._get_init_fn(row_init_method)
+                )
+            else:
+                # (@adithyare) we use this option to mirror the behavior a column parallel layer with two low-rank column parallel layers
+                # if the original column parallel layer uses gather_output=False, then we will use the self.liner_out layer defined below.
+                self.linear_out = ColumnParallelLinear(
+                    dim, out_features, bias=False, gather_output=False, init_method=self._get_init_fn(row_init_method)
+                )
 
         if self.norm_position in ["pre", "post"]:
             ln_features = in_features if self.norm_position == "pre" else out_features
