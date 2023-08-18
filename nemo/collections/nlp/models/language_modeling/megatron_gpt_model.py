@@ -676,6 +676,12 @@ class MegatronGPTModel(MegatronBaseModel, TextGeneration):
         else:
             self._append_sequence_parallel_module_grads(self.model, grads)
 
+        # (guyueh): This can happen for a layernorm that is not trainable. 
+        # torch _flatten_dense_tensors cannot handle empty list, and  
+        # since there is nothing to do we directly return.
+        if len(grads) == 0:
+            return
+        
         coalesced = torch._utils._flatten_dense_tensors(grads)
         torch.distributed.all_reduce(coalesced, group=parallel_state.get_tensor_model_parallel_group())
         for buf, synced in zip(grads, torch._utils._unflatten_dense_tensors(coalesced, grads)):
