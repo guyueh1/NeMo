@@ -38,6 +38,7 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
         super().__init__(cfg, trainer)
         self.setup_complete = False
         self.base_keys = self.get_all_keys()
+        self.freeze()
         self.init_peft_modules()
         self.adapter_keys = self.get_all_keys() - self.base_keys
 
@@ -126,7 +127,7 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
             if isinstance(module, adapter_mixins.AdapterModuleMixin) and module.is_adapter_available():
                 module.set_enabled_adapters(enabled=True)
                 module.unfreeze_enabled_adapters()  # selectively unfreeze the adapter modules.
-                opt_params += [p for p in module.parameters()]
+                opt_params += [p for p in module.parameters() if p.requires_grad]
 
         self._optimizer_param_groups = ({"params": opt_params},)
         logging.info(f"Optimizer groups set:\n{self.summarize()}")
