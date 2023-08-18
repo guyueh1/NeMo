@@ -61,6 +61,13 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         gpt_cfg.hidden_dropout = cfg.model.get('hidden_dropout', 0.0)
         gpt_cfg.attention_dropout = cfg.model.get('attention_dropout', 0.0)
         gpt_cfg.ffn_dropout = cfg.model.ffn_dropout
+        if cfg.model.get('tokenizer', None) is not None:
+            tokenizer_cfg = cfg.model.tokenizer
+            if tokenizer_cfg.get('model', None) is not None:
+                gpt_cfg.tokenizer.model = tokenizer_cfg.model
+            if tokenizer_cfg.get('tokenizer_model') is not None:
+                gpt_cfg.tokenizer.tokenizer_model = tokenizer_cfg.tokenizer_model
+        gpt_cfg.nsys_profile = cfg.model.nsys_profile
         sft_cls = MegatronGPTSFTModel
         gpt_cfg.target = f"{sft_cls.__module__}.{sft_cls.__name__}"
 
@@ -84,6 +91,12 @@ def load_from_nemo(cls, cfg, trainer, gpt_cfg, modify_confg_fn):
         override_config_path=gpt_cfg,
         save_restore_connector=save_restore_connector,
     )
+    return model
+
+def init_from_nemo(cls, cfg, trainer, gpt_cfg, modify_confg_fn):
+    gpt_cfg = modify_confg_fn(gpt_cfg, cfg, add_cfg_to_tree=False)
+    print(f"Initializing Nemo model from the following config\n{gpt_cfg}")
+    model = cls(cfg=gpt_cfg, trainer=trainer)
     return model
 
 
@@ -125,6 +138,14 @@ def validate_checkpoint_loading_args(cfg):
         raise ValueError(f'Checkpoint name {cfg.checkpoint_name} is not valid.')
     if cfg.hparams_file is None or not os.path.isfile(cfg.hparams_file):
         raise ValueError(f'Hparams file {cfg.hparams_file} does not exist or is not a file.')
+
+def torch_report_mem(report_peak=False):
+    import torch
+    static_mem = torch.cuda.memory_allocated()
+    peak_mem = torch.cuda.max_memory_allocated()
+    print(f"Current memory allocated {static_mem // 1024//1024} MiB")
+    if report_peak:
+        print(f"Peak memory allocated {peak_mem // 1024//1024} MiB")
 
 
 @hydra_runner(config_path="conf", config_name="megatron_gpt_sft")
@@ -184,10 +205,18 @@ def main(cfg) -> None:
             save_restore_connector=save_restore_connector,
         )
         gpt_cfg = _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False)
-        model = load_from_nemo(MegatronGPTSFTModel, cfg, trainer, gpt_cfg, modify_confg_fn=_modify_config)
+
+        ## chopping for utest on a single GPU
+        gpt_cfg.num_layers = 4
+
+        # model = load_from_nemo(MegatronGPTSFTModel, cfg, trainer, gpt_cfg, modify_confg_fn=_modify_config)
+        model = init_from_nemo(MegatronGPTSFTModel, cfg, trainer, gpt_cfg, modify_confg_fn=_modify_config)
     else:
         validate_checkpoint_loading_args(cfg.model.pretrained_checkpoint)
         model = load_from_checkpoint_dir(MegatronGPTSFTModel, cfg, trainer, modify_confg_fn=_modify_config)
+
+    print("Model initialization success.")
+    torch_report_mem(report_peak=True)
 
     trainer.fit(model)
 
