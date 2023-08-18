@@ -1426,6 +1426,10 @@ class ParallelTransformer(MegatronModule):
         cross_attention_relative_position_bias=None,
         checkpoint_activations_all_layers=None,
     ):
+        
+        mem = torch.cuda.memory_allocated() // 1024 // 1024
+        logging.info(f"Before transformer forward, mem {mem} MiB")
+        
         # Checks.
         if inference_max_sequence_len:
             assert self.activations_checkpoint_method is None, 'inference does not work with activation checkpointing'

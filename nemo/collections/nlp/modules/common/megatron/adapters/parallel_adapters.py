@@ -309,6 +309,10 @@ class PromptEncoderAdapter(nn.Module, AdapterModuleUtil):
         self.inference_table.set_prompt_table(prompt_representation)
 
     def clear_inference_table(self,):
+        parameters_requires_grad=False
+        for p in self.inference_table.prompt_table.parameters():
+            parameters_requires_grad = parameters_requires_grad or p.requires_grad
+        logging.info(f"inference table any param requires_grad {parameters_requires_grad}")
         self.inference_table.clear_prompt_table()
 
     def get_inference_table(self,):
@@ -331,10 +335,12 @@ class PromptEncoderAdapter(nn.Module, AdapterModuleUtil):
             output_embeds = self.get_inference_table().unsqueeze(1)
         else:
             if self.training:
+                logging.info("Encoder forward training!!!")
                 if self.inference_table.is_inference_ready:
                     self.clear_inference_table()
                 output_embeds = self.inner_forward()
             else:
+                logging.info("Encoder forward not training!!!")
                 if not self.inference_table.is_inference_ready:
                     output_embeds = self.inner_forward()
                     self.set_inference_table(output_embeds.squeeze(1))
