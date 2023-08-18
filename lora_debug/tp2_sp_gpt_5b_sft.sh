@@ -1,7 +1,6 @@
 export PATH=/usr/local/bin:$PATH
-NEMO=/lustre/fsw/joc/guyueh/nemo_peft/NeMo
-MLM=/lustre/fsw/joc/guyueh/nemo_peft/megatron-lm
-export PYTHONPATH=${NEMO}:${MLM}:$PYTHONPATH
+NEMO=/lustre/fsw/joc/guyueh/nemo_peft_seqpar_fix/NeMo
+export PYTHONPATH=${NEMO}:$PYTHONPATH
 
 CKPT=/lustre/fsw/joc/big_nlp/nemo_ci_resources/checkpoints/gpt3_5b_bf16_O2_tp2_pp1.nemo
 DATAPATH=/lustre/fsw/joc/guyueh/data
@@ -10,7 +9,7 @@ micro_batch=${1:-4}
 global_batch=128
 max_seq=${2:-2048}
 logfile=${5:-"tp2_sp_gpt_5B_nemo_sft"}
-version=$(git -C ${MLM} rev-parse HEAD)
+version=$(git -C ${NEMO} rev-parse HEAD)
 
 CMD="torchrun --nproc_per_node=8 ${NEMO}/examples/nlp/language_modeling/tuning/megatron_gpt_sft.py trainer.devices=8 trainer.num_nodes=1 ++cluster_type=BCP"
 # CMD="CUDA_VISIBLE_DEVICES=0 python ${NEMO}/examples/nlp/language_modeling/tuning/megatron_gpt_sft.py"
