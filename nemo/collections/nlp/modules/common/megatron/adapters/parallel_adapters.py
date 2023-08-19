@@ -124,14 +124,11 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
         self.activation = activation_registry[activation]()
         self.norm_position = norm_position
 
-        self.model_parallel_config = self._build_model_parallel_config()
-
         self.dtype = utils_funcs.dtype_from_precision(base_model_precision, megatron_amp_O2)
 
         self.linear_in = ColumnParallelLinear(
             in_features,
             dim,
-            config=self.model_parallel_config,
             bias=False,
             gather_output=True,
             init_method=self._get_init_fn(column_init_method),
@@ -141,7 +138,6 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
             self.linear_out = RowParallelLinear(
                 dim,
                 out_features,
-                config=self.model_parallel_config,
                 bias=False,
                 init_method=self._get_init_fn(row_init_method),
                 params_dtype=self.dtype,
@@ -152,7 +148,6 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
             self.linear_out = ColumnParallelLinear(
                 dim,
                 out_features,
-                config=self.model_parallel_config,
                 bias=False,
                 gather_output=False,
                 init_method=self._get_init_fn(row_init_method),
