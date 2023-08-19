@@ -96,6 +96,14 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         gpt_cfg.hidden_dropout = cfg.model.get('hidden_dropout', 0.0)
         gpt_cfg.attention_dropout = cfg.model.get('attention_dropout', 0.0)
         gpt_cfg.ffn_dropout = cfg.model.ffn_dropout
+        gpt_cfg.use_flash_attention = cfg.model.use_flash_attention
+        if cfg.model.get('tokenizer', None) is not None:
+            tokenizer_cfg = cfg.model.tokenizer
+            if tokenizer_cfg.get('model', None) is not None:
+                gpt_cfg.tokenizer.model = tokenizer_cfg.model
+            if tokenizer_cfg.get('tokenizer_model') is not None:
+                gpt_cfg.tokenizer.tokenizer_model = tokenizer_cfg.tokenizer_model
+        gpt_cfg.nsys_profile = cfg.model.nsys_profile
         gpt_cfg.peft = cfg.model.peft
         peft_cls = _get_peft_scheme(cfg.model)
         gpt_cfg.target = f"{peft_cls.__module__}.{peft_cls.__name__}"
@@ -108,6 +116,11 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
 
     return gpt_cfg
 
+def init_from_nemo(cls, cfg, trainer, gpt_cfg, modify_confg_fn):
+    gpt_cfg = modify_confg_fn(gpt_cfg, cfg, add_cfg_to_tree=False)
+    print(f"Initializing Nemo model from the following config\n{gpt_cfg}")
+    model = cls(cfg=gpt_cfg, trainer=trainer)
+    return model
 
 def _get_peft_scheme(cfg):
     if cfg.peft.peft_scheme == "adapter":
@@ -164,6 +177,24 @@ def validate_checkpoint_loading_args(cfg):
     if cfg.hparams_file is None or not os.path.isfile(cfg.hparams_file):
         raise ValueError(f'Hparams file {cfg.hparams_file} does not exist or is not a file.')
 
+import torch
+def torch_report_mem(report_peak=False):
+    static_mem = torch.cuda.memory_allocated()
+    peak_mem = torch.cuda.max_memory_allocated()
+    print(f"Current memory allocated {static_mem // 1024//1024} MiB")
+    if report_peak:
+        print(f"Peak memory allocated {peak_mem // 1024//1024} MiB")
+
+from pytorch_lightning.callbacks import Callback
+class MemReportCallback(Callback):
+    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
+        if batch_idx == 1:
+            logging.info("=== Memory report after the finish of the first batch ===")
+            static_mem = torch.cuda.memory_allocated()
+            peak_mem = torch.cuda.max_memory_allocated()
+            logging.info(f"Current memory allocated {static_mem // 1024//1024} MiB")
+            logging.info(f"Peak memory allocated {peak_mem // 1024//1024} MiB")
+
 
 @hydra_runner(config_path="conf", config_name="megatron_gpt_peft_tuning_config")
 def main(cfg) -> None:
@@ -199,6 +230,7 @@ def main(cfg) -> None:
         plugins.append(TorchElasticEnvironment())
 
     trainer = Trainer(plugins=plugins, strategy=strategy, **cfg.trainer)
+    trainer.callbacks.append(MemReportCallback())
     exp_manager(trainer, cfg.exp_manager)
     # update resume from checkpoint found by exp_manager
     if cfg.model.resume_from_checkpoint is not None:
@@ -230,14 +262,18 @@ def main(cfg) -> None:
         if os.path.isdir(cfg.model.restore_from_path):
             save_restore_connector.model_extracted_dir = cfg.model.restore_from_path
         peft_cls = _get_peft_scheme(cfg.model)
-        model = peft_cls.restore_from(
-            restore_path=cfg.model.restore_from_path,
-            trainer=trainer,
-            override_config_path=base_model_cfg,
-            save_restore_connector=save_restore_connector,
-        )
+        model = init_from_nemo(peft_cls, cfg, trainer, base_model_cfg, modify_confg_fn=_modify_config)
+        # model = peft_cls.restore_from(
+        #     restore_path=cfg.model.restore_from_path,
+        #     trainer=trainer,
+        #     override_config_path=base_model_cfg,
+        #     save_restore_connector=save_restore_connector,
+        # )
     else:
         raise RuntimeError("PEFT training needs a trained base model present.")
+
+    print("Model initialization success.")
+    torch_report_mem(report_peak=True)
 
     trainer.fit(model)
 
