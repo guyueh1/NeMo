@@ -96,6 +96,7 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         gpt_cfg.hidden_dropout = cfg.model.get('hidden_dropout', 0.0)
         gpt_cfg.attention_dropout = cfg.model.get('attention_dropout', 0.0)
         gpt_cfg.ffn_dropout = cfg.model.ffn_dropout
+        gpt_cfg.use_flash_attention = cfg.model.use_flash_attention
         if cfg.model.get('tokenizer', None) is not None:
             tokenizer_cfg = cfg.model.tokenizer
             if tokenizer_cfg.get('model', None) is not None:
