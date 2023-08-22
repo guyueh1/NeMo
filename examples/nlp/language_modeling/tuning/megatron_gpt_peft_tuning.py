@@ -82,6 +82,7 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         gpt_cfg.micro_batch_size = cfg.model.data.train_ds.micro_batch_size
         gpt_cfg.global_batch_size = cfg.model.data.train_ds.global_batch_size
         gpt_cfg.sequence_parallel = cfg.model.get("sequence_parallel", False)
+        gpt_cfg.use_cpu_initialization = cfg.model.get("use_cpu_initialization", False)
         gpt_cfg.activations_checkpoint_granularity = cfg.model.get("activations_checkpoint_granularity", None)
         gpt_cfg.activations_checkpoint_num_layers = cfg.model.get("activations_checkpoint_num_layers", None)
         gpt_cfg.activations_checkpoint_method = cfg.model.get("activations_checkpoint_method", None)
