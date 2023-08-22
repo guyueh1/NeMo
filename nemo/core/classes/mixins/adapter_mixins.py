@@ -218,13 +218,6 @@ class AdapterModuleMixin(ABC):
             adapter_enabled = cfg.pop('enabled', True)
             self.adapter_layer[adapter_name] = instantiate(cfg)
 
-            if base_model_cfg is not None:
-                if base_model_cfg.megatron_amp_O2:
-                    if base_model_cfg.precision == 'bf16':
-                        self.adapter_layer[adapter_name] = self.adapter_layer[adapter_name].bfloat16()
-                    elif int(base_model_cfg.precision) == 16:
-                        self.adapter_layer[adapter_name] = self.adapter_layer[adapter_name].half()
-
             cfg['enabled'] = adapter_enabled
             self.adapter_cfg[adapter_name] = cfg
 

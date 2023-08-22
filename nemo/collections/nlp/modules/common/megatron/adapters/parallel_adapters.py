@@ -70,6 +70,7 @@ class InfusedAdapter(nn.Module, AdapterModuleUtil):
     def __init__(self, in_features: int,) -> None:
         super().__init__()
         self.scalers = nn.Parameter(torch.ones(in_features))
+        
         # Setup adapter strategy
         self.setup_adapter_strategy(adapter_mixin_strategies.ReturnResultAdapterStrategy())
 
@@ -153,6 +154,10 @@ class ParallelLinearAdapter(nn.Module, AdapterModuleUtil):
             self.dropout = nn.Dropout(dropout)
         else:
             self.dropout = None
+        
+        # cast all parameters when using amp O2 training
+        if megatron_amp_O2 and base_model_precision in [torch.float16, 'bf16']:
+            self.bfloat16()
 
         # Setup adapter strategy
         self.setup_adapter_strategy(adapter_mixin_strategies.ReturnResultAdapterStrategy())
@@ -298,6 +303,13 @@ class PromptEncoderAdapter(nn.Module, AdapterModuleUtil):
             sequence_parallel_enabled=sequence_parallel,
             gradient_accumulation_fusion=gradient_accumulation_fusion,
         )
+
+        # cast all parameters when using amp O2 training
+        if model_parallel_config.bf16:
+            self.bfloat16()
+        elif model_parallel_config.fp16:
+            self.half()
+        
         # Setup adapter strategy
         self.setup_adapter_strategy(adapter_mixin_strategies.ReturnResultAdapterStrategy())
 
