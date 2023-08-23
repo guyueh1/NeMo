@@ -224,6 +224,9 @@ class GPTSFTDataset(Dataset):
         input_ids = context_ids
         answer_start_idx = len(input_ids)
 
+        if len(answer_ids) > self.max_seq_length:
+            answer_ids = answer_ids[:self.max_seq_length]
+        
         # Adds bos token in the start
         if self.add_bos:
             context_ids = [self.tokenizer.bos_id] + context_ids
