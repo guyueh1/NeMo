@@ -305,11 +305,11 @@ class PromptEncoderAdapter(nn.Module, AdapterModuleUtil):
             gradient_accumulation_fusion=gradient_accumulation_fusion,
         )
 
-        # cast all parameters when using amp O2 training
-        if model_parallel_config.bf16:
-            self.bfloat16()
-        elif model_parallel_config.fp16:
-            self.half()
+        # # cast all parameters when using amp O2 training
+        # if model_parallel_config.bf16:
+        #     self.bfloat16()
+        # elif model_parallel_config.fp16:
+        #     self.half()
         
         # Setup adapter strategy
         self.setup_adapter_strategy(adapter_mixin_strategies.ReturnResultAdapterStrategy())
