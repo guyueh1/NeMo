@@ -335,21 +335,34 @@ class MegatronGPTAdapterPTuningModel(MegatronGPTPEFTModel):
         self.virtual_tokens = cfg.peft.p_tuning.virtual_tokens
         self.trainable_keys = self.adapter_keys - set(
             [
-                "model.language_model.adapter_layer.ptuning_adapter.inference_table.weight"
+                "model.language_model.adapter_layer.ptuning_adapter.inference_table.weight",
                 "model.module.language_model.adapter_layer.ptuning_adapter.inference_table.weight" # for Float16Model models
             ]
         )
 
-    def setup_optimizer_param_groups(self):
-        self.freeze()  # Freeze the entire model
-        opt_params = []
-        for n, p in self.named_parameters():
-            if n in self.trainable_keys:
-                p.requires_grad = True
-                opt_params.append(p)
+    # def setup_optimizer_param_groups(self):
+    #     self.freeze()  # Freeze the entire model
+    #     opt_params = []
+    #     for n, p in self.named_parameters():
+    #         if n in self.trainable_keys:
+    #             p.requires_grad = True
+    #             opt_params.append(p)
 
-        self._optimizer_param_groups = ({"params": opt_params},)
-        logging.info(f"Optimizer groups set:\n{self.summarize()}")
+    #     self._optimizer_param_groups = ({"params": opt_params},)
+    #     logging.info(f"Optimizer groups set:\n{self.summarize()}")
+    
+    def setup_optimizer_param_groups(self):
+        super().setup_optimizer_param_groups()
+        self.trainable_keys = self.adapter_keys - set(
+            [
+                "model.language_model.adapter_layer.ptuning_adapter.inference_table.weight",
+                "model.module.language_model.adapter_layer.ptuning_adapter.inference_table.weight" # for Float16Model models
+            ]
+        )
+        for n, p in self.named_parameters():
+            if not (n in self.trainable_keys):
+                p.requires_grad = False
+                
 
 class MegatronGPTLoRAModel(MegatronGPTPEFTModel):
     """

@@ -30,5 +30,5 @@ model.answer_only_loss=True \
 ++model.nsys_profile.enabled=True \
 ++model.nsys_profile.start_step=2 \
 ++model.nsys_profile.end_step=2 \
-++model.nsys_profile.gen_shape=True
+++model.nsys_profile.gen_shape=True \
 2>&1 | tee nsys_batch_${micro_batch}_freeze_${freeze_before_training}_${logfile}.log
