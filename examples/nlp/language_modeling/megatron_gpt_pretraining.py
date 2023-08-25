@@ -37,6 +37,7 @@ def main(cfg) -> None:
     with open_dict(cfg):
         cfg.model.precision = cfg.trainer.precision
 
+    print(cfg)
     model = MegatronGPTModel(cfg.model, trainer)
 
     trainer.fit(model)

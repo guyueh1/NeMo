@@ -19,6 +19,7 @@ tag=${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_PP_${PP}_SP_${SP}_MBS_${M
 # OPTIM="fused_adam"
 
 # NVTE_FLASH_ATTN=0 NVTE_FUSED_ATTN=0 \
+CUDA_DEVICE_MAX_CONNECTIONS=1 \
 torchrun --nproc_per_node=${NUM_DEVICES} ${NEMO}/examples/nlp/language_modeling/megatron_gpt_pretraining.py \
 --config-path=${NEMO}/debug_llama2_pretrain \
 --config-name llama2_${MODEL}_hydra.yaml \
