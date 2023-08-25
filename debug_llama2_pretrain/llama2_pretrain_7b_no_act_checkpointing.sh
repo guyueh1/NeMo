@@ -1,3 +1,4 @@
+#!/bin/bash
 NEMO=/lustre/fsw/joc/guyueh/llama2_a100_perf/nemo_jason_mcore_llama
 MLM=/lustre/fsw/joc/guyueh/llama2_a100_perf/mlm-github
 TE=/lustre/fsw/joc/guyueh/llama2_a100_perf/TransformerEngine
@@ -7,9 +8,9 @@ TP=${2:-1}
 PP=${3:-1}
 SP=${4:-"False"}
 GLOBAL_BATCH_SIZE=${5:-128}
-NUM_DEVICES=8
-NUM_NODES=1
-MODEL="7b"
+NUM_DEVICES=${6:-8}
+NUM_NODES=${7:-1}
+MODEL=${8:-"7b"}
 
 version=$(git rev-parse HEAD)
 
@@ -32,4 +33,7 @@ model.global_batch_size=${GLOBAL_BATCH_SIZE} \
 model.sequence_parallel=${SP} \
 model.pipeline_model_parallel_size=${PP} \
 model.tensor_model_parallel_size=${TP} \
+model.activations_checkpoint_granularity=null \
+model.activations_checkpoint_method=null \
+model.activations_checkpoint_num_layers=null \
 2>&1 | tee llama2_pretrain_${tag}.log
