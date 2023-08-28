@@ -1,6 +1,7 @@
 mcore_gpt: true
 micro_batch_size: 4
 global_batch_size: 8
+rampup_batch_size: null
 tensor_model_parallel_size: 1
 pipeline_model_parallel_size: 1
 virtual_pipeline_model_parallel_size: null
@@ -40,12 +41,12 @@ num_query_groups: 8
 tokenizer:
   library: sentencepiece
   type: null
-  model: nemo:fd890f5cb7cb4328b8effaf994b5cc6f_tokenizer.model
+  model: /lustre/fsw/joc/guyueh/data/ckpt/llama2_configs/7b/d1e3abb2c546424a819a77872c2c8cac_tokenizer.model
+  tokenizer_model: /lustre/fsw/joc/guyueh/data/ckpt/llama2_configs/7b/406edc051f0b4e68abfb770be8fc22a2_tokenizer.model
+  delimiter: null
   vocab_file: null
   merge_file: null
-  delimiter: null
   sentencepiece_legacy: false
-  tokenizer_model: nemo:87835a2c1883444197d0e426605c6ab0_tokenizer.model
 native_amp_init_scale: 4294967296
 native_amp_growth_interval: 1000
 hysteresis: 2
@@ -82,6 +83,7 @@ fp8_amax_history_len: 1
 fp8_amax_compute_algo: most_recent
 reduce_amax: true
 use_emha: false
+ub_tp_comm_overlap: false
 data:
   index_mapping_dir: null
   data_impl: mmap

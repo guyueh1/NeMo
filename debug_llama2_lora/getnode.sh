@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH
 
-ACCOUNT=joc
+ACCOUNT=coreai_dlalgo_llm
 job=${ACCOUNT}-llama2:lora_debug
 partition=interactive
 NODE=1

@@ -1,6 +1,7 @@
 mcore_gpt: true
 micro_batch_size: 4
 global_batch_size: 8
+rampup_batch_size: null
 tensor_model_parallel_size: 1
 pipeline_model_parallel_size: 1
 virtual_pipeline_model_parallel_size: null
@@ -82,6 +83,7 @@ fp8_amax_history_len: 1
 fp8_amax_compute_algo: most_recent
 reduce_amax: true
 use_emha: false
+ub_tp_comm_overlap: false
 data:
   index_mapping_dir: null
   data_impl: mmap

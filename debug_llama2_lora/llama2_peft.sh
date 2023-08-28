@@ -9,21 +9,23 @@ NUM_DEVICES=${4:-8}
 NUM_NODES=${5:-1}
 peft_scheme=${6:-"lora"}
 PAD_TO_MAX_LENGTH=${7:-"True"}
+MODEL=${8:-"7b"}
+MAX_SEQ_LENGTH=${9:-2048}
 
 version=$(git rev-parse HEAD)
 
-tag=${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_SP_${SP}_MBS_${MICRO_BATCH_SIZE}_peft_${peft_scheme}_pad_${PAD_TO_MAX_LENGTH}_v_${version}
+tag=${MODEL}_${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_SP_${SP}_MBS_${MICRO_BATCH_SIZE}_peft_${peft_scheme}_pad_${PAD_TO_MAX_LENGTH}_v_${version}
 
 ## squad
 DATASET_DIR=/lustre/fsw/joc/guyueh/data/SQuAD
 TRAIN="[${DATASET_DIR}/squad_train.jsonl]"
 VALID="[${DATASET_DIR}/squad_val.jsonl]"
 VALID_NAMES=null
-CKPT_DIR=${NEMO}/debug_llama2_lora/jason_cfgs/7b
+CKPT_DIR=${NEMO}/debug_llama2_lora/jason_cfgs/${MODEL}
 
 NVTE_FLASH_ATTN=0 NVTE_FUSED_ATTN=0 \
 torchrun --nproc_per_node=${NUM_DEVICES} ${NEMO}/examples/nlp/language_modeling/tuning/megatron_gpt_peft_tuning.py \
---config-path=${NEMO}/examples/nlp/language_modeling/tuning/conf \
+--config-path ${NEMO}/examples/nlp/language_modeling/tuning/conf \
 --config-name megatron_gpt_peft_tuning_config  \
 ++cluster_type=BCP \
 trainer.max_steps=10000 \
@@ -36,11 +38,14 @@ model.sequence_parallel=${SP} \
 model.tensor_model_parallel_size=${TP} \
 model.pipeline_model_parallel_size=1 \
 model.data.train_ds.file_names=${TRAIN} \
-model.data.validation_ds.file_names=${VALID} \
+model.data.train_ds.max_seq_length=${MAX_SEQ_LENGTH} \
 ++model.data.train_ds.pad_to_max_length=${PAD_TO_MAX_LENGTH} \
 model.data.train_ds.concat_sampling_probabilities=[1.0] \
+model.data.validation_ds.file_names=${VALID} \
+model.data.validation_ds.max_seq_length=${MAX_SEQ_LENGTH} \
 model.restore_from_path=${CKPT_DIR} \
 model.megatron_amp_O2=True \
+++model.use_flash_attention=True \
 2>&1 | tee llama2_peft_${tag}.log
 # trainer.max_steps=6000 \
 # trainer.precision=bf16 \
