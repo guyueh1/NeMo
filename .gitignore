@@ -181,3 +181,4 @@ nemo_experiments/
 
 *.err
 *.out
+*.nsys-rep

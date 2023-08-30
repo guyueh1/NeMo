@@ -40,4 +40,4 @@ model.nsys_profile.enabled=True \
 model.nsys_profile.start_step=0 \
 model.nsys_profile.end_step=0 \
 model.nsys_profile.gen_shape=True \
-2>&1 | tee llama2_pretrain_${tag}.log
+2>&1 | tee nsys_llama2_pretrain_${tag}.log

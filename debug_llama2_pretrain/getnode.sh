@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH
 
-ACCOUNT=joc
+ACCOUNT=coreai_dlalgo_llm
 job=${ACCOUNT}-llama2:pretrain_debug
 partition=interactive
 NODE=1
@@ -12,7 +12,7 @@ srun \
 -p $partition \
 -A ${ACCOUNT} \
 -N $NODE \
---container-image nvcr.io/nvidian/bignlp-train:23.08-nemofw-nightly \
+--container-image /lustre/fsw/joc/guyueh/nemo_llama2.sqsh \
 --container-mounts "\
 /lustre/fsw/joc/guyueh/llama2_a100_perf:/lustre/fsw/joc/guyueh/llama2_a100_perf,\
 /lustre/fsw/joc/guyueh/data:/lustre/fsw/joc/guyueh/data,\
