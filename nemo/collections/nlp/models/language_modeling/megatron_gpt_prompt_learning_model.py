@@ -131,7 +131,6 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
             frozen_model_cfg.activations_checkpoint_method = self.cfg.get("activations_checkpoint_method", None)
 
         if self.trainer.precision in ['bf16', 'bf16-mixed']:
-            # set hidden size in the model parallel config for pipeline parallel schedules
             self.autocast_dtype = torch.bfloat16
         elif self.trainer.precision in [32, '32', '32-true']:
             self.autocast_dtype = torch.float
@@ -188,7 +187,10 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
         self.pseudo_tokens = get_pseudo_tokens(self.max_virtual_tokens)
         if isinstance(self.tokenizer, SentencePieceTokenizer):
             if not self.tokenizer.legacy:
-                self.tokenizer.pad_token = self.tokenizer.ids_to_tokens([self.tokenizer.eos_id])[0]
+                if self.tokenizer.pad_id != -1:
+                    self.tokenizer.pad_token = self.tokenizer.ids_to_tokens([self.tokenizer.pad_id])[0]
+                else:
+                    self.tokenizer.pad_token = self.tokenizer.ids_to_tokens([self.tokenizer.eos_id])[0]
                 self.tokenizer.bos_token = self.tokenizer.ids_to_tokens([self.tokenizer.bos_id])[0]
                 self.tokenizer.eos_token = self.tokenizer.ids_to_tokens([self.tokenizer.eos_id])[0]
                 self.tokenizer.legacy = True
@@ -391,8 +393,8 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
         return
 
     def validation_step(self, dataloader_iter, batch_idx):
-        # Prefetch the dataloader_iter before fwd_bwd func to avoid PP rank 2 from waiting indefinitely when PP rank 1 reaches the end of dataloader_iter
-        dataloader_iter, done = self._prefetch(dataloader_iter)
+        # Check if iterator is exhausted
+        dataloader_iter, done = self._val_iterator_done(dataloader_iter)
         if done:
             return
         mode = 'test' if self.trainer.testing else 'val'

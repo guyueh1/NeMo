@@ -45,17 +45,17 @@ RUN apt-get update && \
 WORKDIR /workspace/
 
 WORKDIR /tmp/
-# TODO: Remove once this Apex commit (5/12/23) is included in PyTorch
-# container
+
+# DP independent checkpoint format for distributed adam
 RUN git clone https://github.com/NVIDIA/apex.git && \
   cd apex && \
-  git checkout 8b7a1ff183741dd8f9b87e7bafd04cfde99cea28 && \
+  git checkout 7995de18677295c5edeeab082179edbfdb6ee16a && \
   pip3 install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" --global-option="--fast_layer_norm" --global-option="--distributed_adam" --global-option="--deprecated_fused_adam" ./
 
 # install megatron core, this can be removed once 0.3 pip package is released
 RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \
   cd Megatron-LM && \
-  git checkout d6f159e2c5e69317b1d283de4deb855dee1a106d && \
+  git checkout 1b1a798bca149ecf98d43b6082cd1ee80079eadf && \
   pip install -e .
 
 # uninstall stuff from base container

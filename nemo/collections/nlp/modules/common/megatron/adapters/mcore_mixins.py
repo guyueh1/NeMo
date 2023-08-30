@@ -34,25 +34,33 @@ def swap_mcore_mixin(module, mcore_mixin):
 
 class MCoreAdapterModuleMixin(adapter_mixins.AdapterModuleMixin):
     def mcore_register_adapters(self):
+        """
+        Performs any necessary setup after swapping class.
+        Must use self.set_accepted_adapter_types([<NeMo adapter config>_target_]) to register adapter.
+        """
         raise NotImplementedError("Mcore mixins should implement setup_adapters on a subclass of MyBase")
 
 
 class MCoreSelfAttentionMixin(SelfAttention, MCoreAdapterModuleMixin):
     def mcore_register_adapters(self):
+        """
+        Setup NeMo LoRA adapter to this MCore layer.
+        """
         self.set_accepted_adapter_types([LoraKQVAdapterConfig._target_])  # only self attn (packed qkv) for now
+        self.linear_qkv.return_layernorm_output = True  # need layernorm output for lora mlp
 
     def get_query_key_value_tensors(self, hidden_states, key_value_states=None):
         """
         Derives `query`, `key` and `value` tensors from `hidden_states`.
         """
         # Attention heads [sq, b, h] --> [sq, b, ng * (np/ng + 2) * hn)]
-        mixed_qkv, _ = self.linear_qkv(hidden_states)
+        (mixed_qkv, layernorm_output), _ = self.linear_qkv(hidden_states)
 
         # LoRA logic
         if self.is_adapter_available():
             lora_kqv_adapter = self.get_adapter_module(AdapterName.LORA_KQV_ADAPTER)
             if lora_kqv_adapter:
-                lora_mixed_qkv = lora_kqv_adapter(hidden_states)
+                lora_mixed_qkv = lora_kqv_adapter(layernorm_output)
                 mixed_qkv = mixed_qkv + lora_mixed_qkv
 
         # [sq, b, hp] --> [sq, b, ng, (np/ng + 2) * hn]
@@ -87,6 +95,9 @@ class MCoreSelfAttentionMixin(SelfAttention, MCoreAdapterModuleMixin):
 
 class MCoreGPTEmbeddingMixin(GPTEmbedding, MCoreAdapterModuleMixin):
     def mcore_register_adapters(self):
+        """
+        Setup NeMo ptuning adapter to this MCore layer.
+        """
         self.set_accepted_adapter_types([PromptEncoderAdapterConfig._target_])
 
     def forward(self, input_ids, position_ids):

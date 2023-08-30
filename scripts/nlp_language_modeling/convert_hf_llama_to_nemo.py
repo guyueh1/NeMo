@@ -93,6 +93,16 @@ def load_config(args, llama_config):
     nemo_config.use_cpu_initialization = True
     nemo_config.activation = 'fast-swiglu' if args.fast_swiglu else 'swiglu'
     nemo_config.tokenizer.model = llama_config['tokenizer_model']
+    if llama_config['rope_scaling'] is not None:
+        if llama_config['rope_scaling']['type'] == 'linear':
+            nemo_config['seq_len_interpolation_factor'] = llama_config['rope_scaling']['factor']
+        else:
+            raise ValueError("Only linear rope scaling type is supported now")
+
+    base = 128
+    while llama_config['vocab_size'] % base != 0:
+        base //= 2
+    nemo_config.make_vocab_size_divisible_by = base
 
     return nemo_config
 
@@ -177,12 +187,14 @@ def convert(args):
         embed_weights_base_name = f'model.language_model.embedding.word_embeddings.weight'
     checkpoint['state_dict'][embed_weights_base_name] = param_to_weights(embed_weight)
 
-    rotary_embed_weight = model.state_dict()[f'model.layers.0.self_attn.rotary_emb.inv_freq']
-    if mcore_gpt:
-        rotary_embed_weight_base_name = f'model.rotary_pos_emb.inv_freq'
-    else:
-        rotary_embed_weight_base_name = f'model.language_model.rotary_pos_emb.inv_freq'
-    checkpoint['state_dict'][rotary_embed_weight_base_name] = param_to_weights(rotary_embed_weight)
+    # in hf, this is defined as register_buffer(..., persistent=False) so it won't be in the state dict
+    if f'model.layers.0.self_attn.rotary_emb.inv_freq' in model.state_dict():
+        rotary_embed_weight = model.state_dict()[f'model.layers.0.self_attn.rotary_emb.inv_freq']
+        if mcore_gpt:
+            rotary_embed_weight_base_name = f'model.rotary_pos_emb.inv_freq'
+        else:
+            rotary_embed_weight_base_name = f'model.language_model.rotary_pos_emb.inv_freq'
+        checkpoint['state_dict'][rotary_embed_weight_base_name] = param_to_weights(rotary_embed_weight)
 
     if nemo_config.num_query_groups is None or nemo_config.num_query_groups == head_num:
         num_query_groups = head_num
@@ -248,16 +260,14 @@ def convert(args):
         # LayerNorm
         input_ln_weight = model.state_dict()[f'model.layers.{l}.input_layernorm.weight']
         if mcore_gpt:
-            # input_ln_base_name = f'model.decoder.layers.{l}.self_attention.linear_qkv.layer_norm_weight'
-            input_ln_base_name = f'model.decoder.layers.{l}.input_layernorm.weight'
+            input_ln_base_name = f'model.decoder.layers.{l}.self_attention.linear_qkv.layer_norm_weight'
         else:
             input_ln_base_name = f'model.language_model.encoder.layers.{l}.input_layernorm.weight'
         checkpoint['state_dict'][input_ln_base_name] = param_to_weights(input_ln_weight)
 
         post_attn_ln_weight = model.state_dict()[f'model.layers.{l}.post_attention_layernorm.weight']
         if mcore_gpt:
-            # post_attn_ln_base_name = f'model.decoder.layers.{l}.mlp.linear_fc1.layer_norm_weight'
-            post_attn_ln_base_name = f'model.decoder.layers.{l}.post_self_attn_layernorm.weight'
+            post_attn_ln_base_name = f'model.decoder.layers.{l}.mlp.linear_fc1.layer_norm_weight'
         else:
             post_attn_ln_base_name = f'model.language_model.encoder.layers.{l}.post_attention_layernorm.weight'
         checkpoint['state_dict'][post_attn_ln_base_name] = param_to_weights(post_attn_ln_weight)
