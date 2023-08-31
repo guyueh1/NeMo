@@ -40,5 +40,4 @@ model.tensor_model_parallel_size=${TP} \
 model.fp8=True \
 model.transformer_engine=True \
 model.fp8_e4m3=True \
-model.megatron_amp_O2=True \
-2>&1 | tee llama2_pretrain_${tag}.log
+2>&1 | tee llama2_pretrain_fp8_${tag}.log
