@@ -92,7 +92,7 @@ class MegatronBaseModel(NLPModel):
         if trainer is None:
             raise ValueError(f"Trainer cannot be None for Megatron-based models. Please provide a PTL trainer object.")
 
-        if cfg.get('use_flash_attention', False) and not HAVE_FLASH_ATTENTION:
+        if cfg.get('use_flash_attention', False) and (not cfg.get('mcore_gpt', False)) and not HAVE_FLASH_ATTENTION:
             raise ImportError(
                 "flash_attn was not found. Please see the installation instructions: https://github.com/HazyResearch/flash-attention."
                 "If you use flash_attn with triton. Please install triton==2.0.0.dev20221202."
