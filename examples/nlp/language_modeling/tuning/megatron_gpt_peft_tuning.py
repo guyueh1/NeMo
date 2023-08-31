@@ -81,9 +81,12 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
     OmegaConf.resolve(cfg)
     with open_dict(gpt_cfg):
         gpt_cfg.megatron_amp_O2 = cfg.model.get('megatron_amp_O2', False)
+        gpt_cfg.use_flash_attention = cfg.model.get('use_flash_attention', False)
         gpt_cfg.micro_batch_size = cfg.model.data.train_ds.micro_batch_size
         gpt_cfg.global_batch_size = cfg.model.data.train_ds.global_batch_size
         gpt_cfg.sequence_parallel = cfg.model.get("sequence_parallel", False)
+        gpt_cfg.tensor_model_parallel_size = cfg.model.get("tensor_model_parallel_size", 1)
+        gpt_cfg.pipeline_model_parallel_size = cfg.model.get("pipeline_model_parallel_size", 1)
         gpt_cfg.activations_checkpoint_granularity = cfg.model.get("activations_checkpoint_granularity", None)
         gpt_cfg.activations_checkpoint_num_layers = cfg.model.get("activations_checkpoint_num_layers", None)
         gpt_cfg.activations_checkpoint_method = cfg.model.get("activations_checkpoint_method", None)
