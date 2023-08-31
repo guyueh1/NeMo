@@ -131,7 +131,6 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
             frozen_model_cfg.activations_checkpoint_method = self.cfg.get("activations_checkpoint_method", None)
 
         if self.trainer.precision in ['bf16', 'bf16-mixed']:
-            # set hidden size in the model parallel config for pipeline parallel schedules
             self.autocast_dtype = torch.bfloat16
         elif self.trainer.precision in [32, '32', '32-true']:
             self.autocast_dtype = torch.float
@@ -188,7 +187,10 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
         self.pseudo_tokens = get_pseudo_tokens(self.max_virtual_tokens)
         if isinstance(self.tokenizer, SentencePieceTokenizer):
             if not self.tokenizer.legacy:
-                self.tokenizer.pad_token = self.tokenizer.ids_to_tokens([self.tokenizer.eos_id])[0]
+                if self.tokenizer.pad_id != -1:
+                    self.tokenizer.pad_token = self.tokenizer.ids_to_tokens([self.tokenizer.pad_id])[0]
+                else:
+                    self.tokenizer.pad_token = self.tokenizer.ids_to_tokens([self.tokenizer.eos_id])[0]
                 self.tokenizer.bos_token = self.tokenizer.ids_to_tokens([self.tokenizer.bos_id])[0]
                 self.tokenizer.eos_token = self.tokenizer.ids_to_tokens([self.tokenizer.eos_id])[0]
                 self.tokenizer.legacy = True
@@ -297,16 +299,6 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
                 labels=labels,
                 inference_params=inference_params,
             )
-        elif self.autocast_dtype == torch.float32:
-            output = self.frozen_model.model(
-                input_ids=None,
-                position_ids=None,
-                encoder_input=encoder_input,
-                attention_mask=attention_mask,
-                labels=labels,
-                set_inference_key_value_memory=set_inference_key_value_memory,
-                inference_max_sequence_len=inference_max_sequence_len,
-            )
         else:
             output = self.frozen_model.model(
                 input_ids=None,
@@ -391,8 +383,8 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
         return
 
     def validation_step(self, dataloader_iter, batch_idx):
-        # Prefetch the dataloader_iter before fwd_bwd func to avoid PP rank 2 from waiting indefinitely when PP rank 1 reaches the end of dataloader_iter
-        dataloader_iter, done = self._prefetch(dataloader_iter)
+        # Check if iterator is exhausted
+        dataloader_iter, done = self._val_iterator_done(dataloader_iter)
         if done:
             return
         mode = 'test' if self.trainer.testing else 'val'
@@ -531,7 +523,7 @@ class MegatronGPTPromptLearningModel(MegatronBasePromptLearningModel):
     def setup(self, stage=None):
         super().setup(stage)
 
-        if self.frozen_model.cfg.get('transformer_engine', False):
+        if self.cfg.get('transformer_engine', False) or self.cfg.get('mcore_gpt', False):
             self.frozen_model.setup_transformer_engine_tp_groups()
 
     def setup_training_data(self, training_data_config=None):

@@ -20,6 +20,7 @@ from nemo.collections.nlp.models.language_modeling.megatron_gpt_sft_model import
 from nemo.collections.nlp.modules.common.megatron.adapters.mcore_mixins import (
     MCoreGPTEmbeddingMixin,
     MCoreSelfAttentionMixin,
+    MCoreTransformerLayerMixin,
     swap_mcore_mixin,
 )
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
@@ -66,7 +67,7 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
         assert len(self.peft_name_keys) > 0, "peft_name_keys have not been set no PEFT modules will be added"
         assert not self.mcore_gpt or hasattr(
             self, 'name_key_to_mcore_mixins'
-        ), "some of the PEFT modules are not supported in megatron core mode yet."
+        ), f"{self.__class__.__name__} is not supported in megatron core mode yet."
         assert len(self.name_key_to_cfg) > 0, "name_key_to_cfg has not been set no PEFT modules will be added"
         logging.info(f"Before adding PEFT params:\n{self.summarize()}")
         for name, module in self.named_modules():
@@ -112,7 +113,9 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
         Returns all the keys in the model
         """
         k = [n for n, p in self.named_parameters()]
-        return set(k)
+        b = [n for n, p in self.named_buffers() if n.replace("model.module.", "model.", 1) in self.state_dict().keys()]
+        # we include buffers because ptuning representations are cached in a buffer and saved to state_dict for inference time use.
+        return set(k + b)
 
     def get_peft_state_dict(self,):
         """ 
@@ -136,7 +139,15 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
             # so we call self.model.state_dict(prefix="model.") which will return all the keys and params same as calling self.state_dict()
             return self.model.state_dict(prefix="model.")
 
+    def sharded_state_dict(self, prefix: str = ''):
+        if self.setup_complete:
+            return None
+        else:
+            return self.model.sharded_state_dict(prefix="model.")
+
     def load_state_dict(self, state_dict, strict: bool = True):
+        if len(state_dict) == 0:
+            return  # checkpoint is loaded in on_load_checkpoint()
         if self.setup_complete:
             # at this stage only PEFT params will appear in the state_dict arg
             # so we only update those while the rest of the model is frozen.
@@ -165,7 +176,6 @@ class MegatronGPTPEFTModel(MegatronGPTSFTModel):
                 module.set_enabled_adapters(enabled=True)
                 module.unfreeze_enabled_adapters()  # selectively unfreeze the adapter modules.
                 opt_params += [p for p in module.parameters() if p.requires_grad]
-
         self._optimizer_param_groups = ({"params": opt_params},)
         logging.info(f"Optimizer groups set:\n{self.summarize()}")
 
@@ -183,7 +193,7 @@ class MegatronGPTLayerwisePEFTModel(MegatronGPTPEFTModel):
         assert len(self.peft_name_keys) > 0, "peft_name_keys have not been set no PEFT modules will be added"
         assert not self.mcore_gpt or hasattr(
             self, 'name_key_to_mcore_mixins'
-        ), "some of the PEFT modules are not supported in megatron core mode yet."
+        ), f"{self.__class__.__name__} is not supported in megatron core mode yet."
         assert len(self.name_key_to_cfg) > 0, "name_key_to_cfg has not been set no PEFT modules will be added"
         logging.info(f"Before adding PEFT params:\n{self.summarize()}")
         if self.mcore_gpt:
@@ -264,8 +274,10 @@ class MegatronGPTAdapterModel(MegatronGPTLayerwisePEFTModel):
         )
 
         self.name_key_to_cfg = {}
+        self.name_key_to_mcore_mixins = {}
         for k in self.peft_name_keys:
             self.name_key_to_cfg[k] = adapter_cfg
+            self.name_key_to_mcore_mixins[k] = [("", MCoreTransformerLayerMixin)]
 
         self.layer_selection = adapter_tuning_cfg.get("layer_selection", None)
         if self.layer_selection is None:
@@ -302,8 +314,10 @@ class MegatronGPTAdapterModelWeightTying(MegatronGPTLayerwisePEFTModel):
         )
 
         self.name_key_to_cfg = {}
+        self.name_key_to_mcore_mixins = {}
         for k in self.peft_name_keys:
             self.name_key_to_cfg[k] = adapter_cfg
+            self.name_key_to_mcore_mixins[k] = [("", MCoreTransformerLayerMixin)]
 
         self.layer_selection = adapter_tuning_cfg.get("layer_selection", None)
         if self.layer_selection is None:
@@ -313,14 +327,26 @@ class MegatronGPTAdapterModelWeightTying(MegatronGPTLayerwisePEFTModel):
 
     def tie_weights(self,):
         pos_idx = 0
-        layer0 = self.model.language_model.encoder.layers[0]
+
+        if self.mcore_gpt:
+            if self.cfg.megatron_amp_O2:
+                layers = self.model.module.decoder.layers
+            else:
+                layers = self.model.decoder.layers
+        else:
+            if self.cfg.megatron_amp_O2:
+                layers = self.model.module.language_model.encoder.layers
+            else:
+                layers = self.model.language_model.encoder.layers
+
+        layer0 = layers[0]
         for adapter_name in layer0.adapter_layer:
             adapter = layer0.get_adapter_module(adapter_name)
             print(adapter_name, pos_idx)
             adapter.set_position(pos_idx)
             pos_idx += 1
 
-        for layer in self.model.language_model.encoder.layers[1:]:
+        for layer in layers[1:]:
             for adapter_name in layer.adapter_layer:
                 print(adapter_name, pos_idx)
                 adapter_l = layer.get_adapter_module(adapter_name)
@@ -390,15 +416,6 @@ class MegatronGPTPTuningModel(MegatronGPTPEFTModel):
         self.name_key_to_mcore_mixins = {AdapterName.PTUNING_ADAPTER: [('embedding', MCoreGPTEmbeddingMixin)]}
         super().__init__(cfg, trainer)
         self.virtual_tokens = cfg.peft.p_tuning.virtual_tokens
-        self.trainable_keys = self.adapter_keys - set(
-            [
-                "model.language_model.adapter_layer.ptuning_adapter.inference_table.prompt_table.taskname.prompt_embeddings.weight",  # non-mcore O1
-                "model.module.language_model.adapter_layer.ptuning_adapter.inference_table.prompt_table.taskname.prompt_embeddings.weight",  # non-mcore O2
-                "model.embedding.adapter_layer.ptuning_adapter.inference_table.prompt_table.taskname.prompt_embeddings.weight",  # mcore O1
-                "model.module.embedding.adapter_layer.ptuning_adapter.inference_table.prompt_table.taskname.prompt_embeddings.weight",  # mcore O2
-            ]
-        )
-        # we exclude the above parameter from training because it is present for backward compatibility for inference using FasterTransformer (@adithyare)
 
     def init_peft_modules(self,):
         """ 
@@ -431,6 +448,8 @@ class MegatronGPTPTuningModel(MegatronGPTPEFTModel):
         Reimplement load_state_dict for ptuning because we also need to check the stage of the pipeline.
         The check is required to make pp>1 to work.
         """
+        if len(state_dict) == 0:
+            return  # checkpoint is loaded in on_load_checkpoint()
         if self.setup_complete:
             if self.first_stage_of_pipeline():
                 # if we are not in the first state of pipeline after setup is done
@@ -440,17 +459,19 @@ class MegatronGPTPTuningModel(MegatronGPTPEFTModel):
         else:
             super().load_state_dict(state_dict, strict=True)
 
+    def on_load_checkpoint(self, checkpoint) -> None:
+        """LightningModule hook:
+        https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_module.html#on-load-checkpoint
+        """
+        if self.setup_complete:
+            if self.first_stage_of_pipeline():
+                super().on_load_checkpoint(checkpoint)
+        else:
+            super().on_load_checkpoint(checkpoint)
+
     def setup_optimizer_param_groups(self):
         if self.first_stage_of_pipeline():
-            # super().setup_optimizer_param_groups()
-            self.freeze()  # Freeze the entire model
-            opt_params = []
-            for n, p in self.named_parameters():
-                if n in self.trainable_keys:
-                    p.requires_grad = True
-                    opt_params.append(p)
-
-            self._optimizer_param_groups = ({"params": opt_params},)
+            super().setup_optimizer_param_groups()
         else:
             self.freeze()  # Freeze the entire model
             self._optimizer_param_groups = ({"params": []},)
@@ -493,26 +514,14 @@ class MegatronGPTAdapterPTuningModel(MegatronGPTPEFTModel):
             AdapterName.POST_ATTN_ADAPTER: adapter_cfg,
             AdapterName.PTUNING_ADAPTER: ptuning_cfg,
         }
+        logging.warning("AdapterPTuning doesn't support mcore for now. need to use regex to match target.")
+        self.name_key_to_mcore_mixins = {
+            AdapterName.PRE_ATTN_ADAPTER: [('', MCoreTransformerLayerMixin)],
+            AdapterName.POST_ATTN_ADAPTER: [('', MCoreTransformerLayerMixin)],
+            AdapterName.PTUNING_ADAPTER: [('embedding', MCoreGPTEmbeddingMixin)],
+        }
         super().__init__(cfg, trainer)
         self.virtual_tokens = cfg.peft.p_tuning.virtual_tokens
-
-    def setup_optimizer_param_groups(self):
-        super().setup_optimizer_param_groups()
-
-        # (guyueh1) This part is used to avoid adding frozen parameters in trainable adapter modules
-        # in the setup_optimizer_param_groups() of the MegatronPEFTModel class, all parameters
-        # in an adapter module are going to be set requires_grad=True. However in ptuning
-        # adapter the inference table should be untrainable. We explicitely set that parameter
-        # to untrainable here.
-        self.trainable_keys = self.adapter_keys - set(
-            [
-                "model.language_model.adapter_layer.ptuning_adapter.inference_table.prompt_table.taskname.prompt_embeddings.weight",
-                "model.module.language_model.adapter_layer.ptuning_adapter.inference_table.prompt_table.taskname.prompt_embeddings.weight",  # for Float16Model or BFloat16Model models
-            ]
-        )
-        for n, p in self.named_parameters():
-            if not (n in self.trainable_keys):
-                p.requires_grad_(False)
 
 
 class MegatronGPTLoRAModel(MegatronGPTLayerwisePEFTModel):
@@ -638,9 +647,15 @@ class MegatronGPTLoRAModelWeightTying(MegatronGPTLayerwisePEFTModel):
         pos_idx = 0
 
         if self.mcore_gpt:
-            layers = self.model.decoder.layers
+            if self.cfg.megatron_amp_O2:
+                layers = self.model.module.decoder.layers
+            else:
+                layers = self.model.decoder.layers
         else:
-            layers = self.model.language_model.encoder.layers
+            if self.cfg.megatron_amp_O2:
+                layers = self.model.module.language_model.encoder.layers
+            else:
+                layers = self.model.language_model.encoder.layers
 
         layer0 = layers[0]
         for adapter_name in layer0.self_attention.adapter_layer:
