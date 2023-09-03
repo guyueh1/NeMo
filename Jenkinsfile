@@ -59,10 +59,10 @@ pipeline {
 
     stage('Megatron Core installation') {
       steps {
-        // pinned MCore https://github.com/NVIDIA/Megatron-LM/commit/1b1a798bca149ecf98d43b6082cd1ee80079eadf (to be updated)
+        // pinned MCore https://github.com/NVIDIA/Megatron-LM/commit/99b044bff07f8e5d48b45223ed4bb11bd4e884e6
         sh 'git clone https://github.com/NVIDIA/Megatron-LM.git && \
             cd Megatron-LM && \
-            git checkout 1b1a798bca149ecf98d43b6082cd1ee80079eadf && \
+            git checkout 99b044bff07f8e5d48b45223ed4bb11bd4e884e6 && \
             pip install -e .'
       }
     }
@@ -72,17 +72,6 @@ pipeline {
         // pinned triton version for flash-attention https://github.com/HazyResearch/flash-attention/blob/main/flash_attn/flash_attn_triton.py#L3
         sh 'pip install flash-attn && \
             pip install triton==2.0.0.dev20221202'
-      }
-    }
-
-    stage('Transformer Engine installation') {
-      steps {
-        // pinned TE https://github.com/NVIDIA/TransformerEngine/commit/85928d0887234a64c63b220e3c09d8a7a0d01c7b
-        sh 'git clone --recursive https://github.com/NVIDIA/TransformerEngine.git && \
-            cd TransformerEngine && \
-            git checkout 85928d0887234a64c63b220e3c09d8a7a0d01c7b && \
-            export NVTE_FRAMEWORK=pytorch && \
-            pip install -e .'
       }
     }
 
@@ -122,6 +111,26 @@ pipeline {
         sh 'CUDA_VISIBLE_DEVICES="" NEMO_NUMBA_MINVER=0.53 pytest -m "not pleasefixme" --cpu --with_downloads --relax_numba_compat'
       }
     }
+
+    // TODO: this requires TE >= v0.11 which is not available in 23.06.
+    //        please uncomment this test once mcore CI is ready.
+    // stage('L2: Community LLM Checkpoints tests') {
+    //   when {
+    //     anyOf {
+    //       branch 'main'
+    //       changeRequest target: 'main'
+    //     }
+    //   }
+    //   failFast true
+    //   steps {
+    //     sh 'CUDA_VISIBLE_DEVICES=0 python scripts/nlp_language_modeling/convert_hf_llama_to_nemo.py \
+    //     --in-file=/home/TestData/nlp/megatron_llama/llama-ci-hf \
+    //     --out-file=/home/TestData/nlp/megatron_llama/ci.nemo \
+    //     --fast-swiglu \
+    //     --precision=16'
+    //     sh 'rm -f /home/TestData/nlp/megatron_llama/ci.nemo'
+    //   }
+    // }
 
     stage('L2: ASR dev run') {
       when {
@@ -5050,24 +5059,6 @@ assert_frame_equal(training_curve, gt_curve, rtol=1e-3, atol=1e-3)"'''
             batch_size=64 \
             tolerance=0.1012'
         sh 'rm -f examples/asr/evaluation_transcripts.json'
-      }
-    }
-
-    stage('L??: Community LLM Checkpoints tests') {
-      when {
-        anyOf {
-          branch 'main'
-          changeRequest target: 'main'
-        }
-      }
-      failFast true
-      steps {
-        sh 'CUDA_VISIBLE_DEVICES=0 python scripts/nlp_language_modeling/convert_hf_llama_to_nemo.py \
-        --in-file=/home/TestData/nlp/megatron_llama/llama-ci-hf \
-        --out-file=/home/TestData/nlp/megatron_llama/ci.nemo \
-        --fast-swiglu \
-        --precision=16'
-        sh 'rm -f /home/TestData/nlp/megatron_llama/ci.nemo'
       }
     }
   }
