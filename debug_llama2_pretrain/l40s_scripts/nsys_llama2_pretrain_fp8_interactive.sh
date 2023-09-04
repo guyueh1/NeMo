@@ -22,6 +22,10 @@ tag=${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_PP_${PP}_SP_${SP}_MBS_${M
 # CUDA_DEVICE_MAX_CONNECTIONS=1 \
 # NCCL_DEBUG=TRACE NCCL_P2P_DISABLE=1 NCCL_SHM_DISABLE=1 NCCL_P2P_DIRECT_DISABLE=1 \
 # NVTE_FLASH_ATTN=0 NVTE_FUSED_ATTN=0 \
+nsys \
+profile -s none -o ./llama2_pretrain_fp8_${tag} \
+-t cuda,nvtx --force-overwrite true \
+--capture-range=cudaProfilerApi --capture-range-end=stop \
 torchrun --nproc_per_node=${NUM_DEVICES} \
 ${NEMO}/examples/nlp/language_modeling/megatron_gpt_pretraining.py \
 --config-path ${NEMO}/debug_llama2_pretrain/l40s_scripts \
@@ -39,4 +43,6 @@ model.pipeline_model_parallel_size=${PP} \
 model.tensor_model_parallel_size=${TP} \
 model.fp8=True \
 model.fp8_e4m3=True \
-2>&1 | tee llama2_pretrain_fp8_${tag}.log
+model.data.num_workers=10 \
+model.nsys_profile.enabled=True \
+2>&1 | tee nsys_llama2_pretrain_fp8_${tag}.log

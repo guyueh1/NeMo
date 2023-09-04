@@ -37,6 +37,4 @@ model.micro_batch_size=${MICRO_BATCH_SIZE} \
 model.sequence_parallel=${SP} \
 model.pipeline_model_parallel_size=${PP} \
 model.tensor_model_parallel_size=${TP} \
-model.fp8=True \
-model.fp8_e4m3=True \
-2>&1 | tee llama2_pretrain_fp8_${tag}.log
+2>&1 | tee llama2_pretrain_${tag}.log
