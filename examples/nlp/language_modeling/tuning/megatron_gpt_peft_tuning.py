@@ -105,6 +105,10 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
         gpt_cfg.attention_dropout = cfg.model.get('attention_dropout', 0.0)
         gpt_cfg.ffn_dropout = cfg.model.ffn_dropout
         gpt_cfg.peft = cfg.model.peft
+        if cfg.model.get('nsys_profile', None) is not None:
+            gpt_cfg.nsys_profile.enabled = cfg.model.nsys_profile.get('enabled', False)
+            gpt_cfg.nsys_profile.start_step = cfg.model.nsys_profile.get('start_step', 10)
+            gpt_cfg.nsys_profile.end_step = cfg.model.nsys_profile.get('end_step', 10)
         peft_cls = _get_peft_scheme(cfg.model)
         gpt_cfg.target = f"{peft_cls.__module__}.{peft_cls.__name__}"
 

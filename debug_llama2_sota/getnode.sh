@@ -2,7 +2,7 @@
 #SBATCH
 
 ACCOUNT=coreai_dlalgo_llm
-job=${ACCOUNT}-llama2:lora_debug
+job=${ACCOUNT}-llama2:pretrain_debug
 partition=interactive
 NODE=1
 # TASK_PER_NODE=8
@@ -12,7 +12,7 @@ srun \
 -p $partition \
 -A ${ACCOUNT} \
 -N $NODE \
---container-image /lustre/fsw/joc/guyueh/nemo-llama-a100_23.08-nightly.sqsh \
+--container-image nvcr.io/nvidian/bignlp-train:23.08-nemofw-nightly \
 --container-mounts "\
 /lustre/fsw/joc/guyueh/llama2_a100_perf:/lustre/fsw/joc/guyueh/llama2_a100_perf,\
 /lustre/fsw/joc/guyueh/data:/lustre/fsw/joc/guyueh/data,\

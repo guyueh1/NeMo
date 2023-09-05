@@ -1662,6 +1662,9 @@ class ModelPT(LightningModule, Model):
             https://pytorch-lightning.readthedocs.io/en/stable/common/lightning_module.html#on-train-batch-start
             We use it here to enable nsys profiling and dynamic freezing.
         """
+        # memory report
+        peak_mem = torch.cuda.max_memory_allocated()
+        logging.info(f"===== Peak Memory Usage {peak_mem // 1024 // 1024} MiB =====")
 
         # nsys profiling
         if self.device.type == 'cuda':

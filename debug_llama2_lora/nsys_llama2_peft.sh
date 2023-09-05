@@ -12,7 +12,7 @@ peft_scheme=${7:-"lora"}
 PAD_TO_MAX_LENGTH=${8:-"True"}
 MODEL=${9:-"7b"}
 MAX_SEQ_LENGTH=${10:-2048}
-GLOBAL_BATCH_SIZE=128
+GLOBAL_BATCH_SIZE=${11:-128}
 
 version=$(git rev-parse HEAD)
 
@@ -25,6 +25,10 @@ VALID="[${DATASET_DIR}/squad_val.jsonl]"
 VALID_NAMES=null
 CKPT_DIR=${NEMO}/debug_llama2_lora/jason_cfgs/${MODEL}
 
+nsys \
+profile -s none -o ./llama2_peft_${tag} \
+-t cuda,nvtx --force-overwrite true \
+--capture-range=cudaProfilerApi --capture-range-end=stop \
 torchrun --nproc_per_node=${NUM_DEVICES} ${NEMO}/examples/nlp/language_modeling/tuning/megatron_gpt_peft_tuning.py \
 --config-path ${NEMO}/examples/nlp/language_modeling/tuning/conf \
 --config-name megatron_gpt_peft_tuning_config  \
@@ -48,7 +52,10 @@ model.data.validation_ds.max_seq_length=${MAX_SEQ_LENGTH} \
 model.restore_from_path=${CKPT_DIR} \
 model.megatron_amp_O2=True \
 ++model.use_flash_attention=True \
-2>&1 | tee llama2_peft_${tag}.log
+++model.nsys_profile.enabled=True \
+++model.nsys_profile.start_step=1 \
+++model.nsys_profile.end_step=1 \
+2>&1 | tee nsys_llama2_peft_${tag}.log
 # trainer.max_steps=6000 \
 # trainer.precision=bf16 \
 # model.data.train_ds.file_names=[<train dataset path>] \

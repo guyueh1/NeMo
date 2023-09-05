@@ -26,10 +26,11 @@ NUM_DEVICES=8
 NUM_NODES=2
 MODEL="13b"
 
-CONTAINER_IMAGE=/lustre/fsw/joc/guyueh/nemo_llama2.sqsh
+CONTAINER_IMAGE=/lustre/fsw/joc/guyueh/nemo-llama-a100_23.08-nightly.sqsh
 # CONTAINER_IMAGE=nvcr.io/nvidian/bignlp-train:23.08-nemofw-nightly
 
-tag=${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_PP_${PP}_SP_${SP}_MBS_${MICRO_BATCH_SIZE}_GBS_${GLOBAL_BATCH_SIZE}_${MODEL}
+version=$(git rev-parse HEAD)
+tag=${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_PP_${PP}_SP_${SP}_MBS_${MICRO_BATCH_SIZE}_GBS_${GLOBAL_BATCH_SIZE}_${MODEL}_v_${version}
 
 # command 1
 srun --output /lustre/fsw/joc/guyueh/llama2_a100_perf/nemo_jason_mcore_llama/debug_llama2_pretrain/llama2_13b/log-coreai_dlalgo_llm-llama2:13b_pretrain_profile_%j.err --error /lustre/fsw/joc/guyueh/llama2_a100_perf/nemo_jason_mcore_llama/debug_llama2_pretrain/llama2_13b/log-coreai_dlalgo_llm-llama2:13b_pretrain_profile_%j.err --container-image ${CONTAINER_IMAGE} --container-mounts "/lustre/fsw/joc/guyueh/llama2_a100_perf:/lustre/fsw/joc/guyueh/llama2_a100_perf,/lustre/fsw/joc/guyueh/data:/lustre/fsw/joc/guyueh/data,/lustre/fsw/joc/big_nlp/nemo_gpt3:/lustre/fsw/joc/big_nlp/nemo_gpt3,/lustre/fsw/joc/big_nlp/nemo_ci_resources:/lustre/fsw/joc/big_nlp/nemo_ci_resources" --no-container-mount-home bash -c "
