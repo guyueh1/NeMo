@@ -14,7 +14,7 @@ MODEL="7b"
 
 version=$(git -C ${NEMO} rev-parse HEAD)
 
-tag=${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_PP_${PP}_SP_${SP}_MBS_${MICRO_BATCH_SIZE}_GBS_${GLOBAL_BATCH_SIZE}_${MODEL}_v_${version}
+tag=GQA_group_8_${NUM_NODES}_nodes_${NUM_DEVICES}_devices_TP_${TP}_PP_${PP}_SP_${SP}_MBS_${MICRO_BATCH_SIZE}_GBS_${GLOBAL_BATCH_SIZE}_${MODEL}_v_${version}
 
 # OPTIM="distributed_fused_adam ++model.optim.bucket_cap_mb=125 ++model.optim.overlap_grad_sync=False"
 # OPTIM="fused_adam"
@@ -29,7 +29,7 @@ profile -s none -o ./llama2_pretrain_fp8_${tag} \
 torchrun --nproc_per_node=${NUM_DEVICES} \
 ${NEMO}/examples/nlp/language_modeling/megatron_gpt_pretraining.py \
 --config-path ${NEMO}/debug_llama2_pretrain/l40s_scripts \
---config-name llama2_${MODEL}_hydra.yaml \
+--config-name llama2_${MODEL}_hydra_gqa.yaml \
 trainer.num_nodes=${NUM_NODES} \
 trainer.devices=${NUM_DEVICES} \
 ++trainer.use_distributed_sampler=false \

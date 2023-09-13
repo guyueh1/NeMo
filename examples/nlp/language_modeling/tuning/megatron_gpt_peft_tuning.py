@@ -82,6 +82,8 @@ def _modify_config(gpt_cfg, cfg, add_cfg_to_tree=False):
     with open_dict(gpt_cfg):
         gpt_cfg.megatron_amp_O2 = cfg.model.get('megatron_amp_O2', False)
         gpt_cfg.use_flash_attention = cfg.model.get('use_flash_attention', False)
+        gpt_cfg.fp8 = cfg.model.get('fp8', False)
+        gpt_cfg.fp8_e4m3 = cfg.model.get('fp8_e4m3', False)
         gpt_cfg.micro_batch_size = cfg.model.data.train_ds.micro_batch_size
         gpt_cfg.global_batch_size = cfg.model.data.train_ds.global_batch_size
         gpt_cfg.sequence_parallel = cfg.model.get("sequence_parallel", False)
