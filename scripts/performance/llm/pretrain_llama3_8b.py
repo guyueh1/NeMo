@@ -98,8 +98,9 @@ if __name__ == "__main__":
         nemo_home=args.nemo_home,
     )
 
-    plugins = [
-        PerfEnvPlugin(enable_vboost=True, nccl_pp_comm_chunksize=2097152 if pp_size > 1 else None),
+    plugins = [PerfEnvPlugin(enable_vboost=True, nccl_pp_comm_chunksize=2097152 if pp_size > 1 else None, 
+                      num_cuda_device_max_connections=32 if args.gpu.lower() in ["b200", "gb200"] else None
+                      ),
     ]
     if args.enable_nsys:
         plugins.append(NsysPlugin(start_step=5, end_step=6))

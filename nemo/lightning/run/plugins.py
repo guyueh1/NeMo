@@ -344,6 +344,7 @@ class PerfEnvPlugin(run.Plugin):
     layernorm_sm_margin: int = 16
     enable_vboost: bool = False
     nccl_pp_comm_chunksize: Optional[int] = None
+    num_cuda_device_max_connections: Optional[int] = None
 
     def get_vboost_srun_cmd(self, nodes, job_dir):
         "Create the vboost `sudo nvidia-smi boost-slider --vboost 1` command"
@@ -373,7 +374,9 @@ class PerfEnvPlugin(run.Plugin):
             # Force program order kernel launch for TP, CP overlap
             tp_size = task.trainer.strategy.tensor_model_parallel_size
             cp_size = task.trainer.strategy.context_parallel_size
-            if tp_size > 1 or cp_size > 1:
+            if self.num_cuda_device_max_connections is not None:
+                executor.env_vars["CUDA_DEVICE_MAX_CONNECTIONS"] = str(self.num_cuda_device_max_connections)
+            elif tp_size > 1 or cp_size > 1:
                 executor.env_vars["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
 
             # Set LayerNorm SM margin to support the overlap with LayerNorm kernel
