@@ -124,6 +124,10 @@ class ParallelismConfig:
     use_te_rng_tracker: bool = False
     expert_tensor_parallel_size: int = None
     use_tp_pp_dp_mapping: bool = False
+    cpu_offloading: bool = False
+    cpu_offloading_num_layers: int = 0
+    cpu_offloading_activations: bool = True
+    cpu_offloading_weights: bool = False
 
 
 class MegatronStrategy(DDPStrategy, io.IOMixin):
@@ -258,6 +262,10 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
         restore_config: Optional[RestoreConfig] = None,
         megatron_log_level: int = 0,
         use_tp_pp_dp_mapping: bool = False,
+        cpu_offloading: bool = False,
+        cpu_offloading_num_layers: int = 0,
+        cpu_offloading_activations: bool = True,
+        cpu_offloading_weights: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -287,6 +295,10 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
         self.encoder_pipeline_model_parallel_size = encoder_pipeline_model_parallel_size
         self.account_for_embedding_in_pipeline_split = account_for_embedding_in_pipeline_split
         self.account_for_loss_in_pipeline_split = account_for_loss_in_pipeline_split
+        self.cpu_offloading = cpu_offloading
+        self.cpu_offloading_num_layers = cpu_offloading_num_layers
+        self.cpu_offloading_activations = cpu_offloading_activations
+        self.cpu_offloading_weights = cpu_offloading_weights
         self.lazy_init = lazy_init
         self.ckpt_load_optimizer = ckpt_load_optimizer
         self.ckpt_save_optimizer = ckpt_save_optimizer
@@ -1022,6 +1034,10 @@ class MegatronStrategy(DDPStrategy, io.IOMixin):
             pipeline_dtype=self.pipeline_dtype,
             use_te_rng_tracker=self.use_te_rng_tracker,
             use_tp_pp_dp_mapping=self.use_tp_pp_dp_mapping,
+            cpu_offloading=self.cpu_offloading,
+            cpu_offloading_num_layers=self.cpu_offloading_num_layers,
+            cpu_offloading_activations=self.cpu_offloading_activations,
+            cpu_offloading_weights=self.cpu_offloading_weights,
         )
 
     @contextmanager
