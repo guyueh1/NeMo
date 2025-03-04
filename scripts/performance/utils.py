@@ -202,6 +202,8 @@ def set_primary_perf_configs(
     vp_size: int,
     ep_size: int,
     etp_size: Optional[int] = None,
+    cpu_offloading: bool = False,
+    cpu_offloading_num_layers: int = 0,
 ):
     """Set experiment configs we usually tune for performance of all models."""
     # nemo.lightning.Trainer configs
@@ -222,6 +224,10 @@ def set_primary_perf_configs(
     recipe.trainer.strategy.expert_tensor_parallel_size = etp_size
 
     recipe.trainer.strategy.sequence_parallel = bool(tp_size > 1)
+
+    # cpu offloading configs
+    recipe.trainer.strategy.cpu_offloading = cpu_offloading
+    recipe.trainer.strategy.cpu_offloading_num_layers = cpu_offloading_num_layers
 
     # callback configs
     comm_overlap_callback_idx = get_comm_overlap_callback_idx(recipe.trainer.callbacks)

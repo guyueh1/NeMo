@@ -270,4 +270,18 @@ def parse_cli_args():
         default=[],
     )
 
+    parser.add_argument(
+        "--cpu_offloading",
+        help="Enable cpu offloading. Disabled by default",
+        action="store_true",
+        required=False,
+    )
+
+    parser.add_argument(
+        "--cpu_offloading_num_layers",
+        type=int,
+        help="Number of layers to offload to CPU. Defaults to 0",
+        required=False,
+    )
+
     return parser

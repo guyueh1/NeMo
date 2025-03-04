@@ -59,6 +59,8 @@ def override_recipe_configs(
         cp_size,
         vp_size,
         ep_size,
+        cpu_offloading=args.cpu_offloading,
+        cpu_offloading_num_layers=args.cpu_offloading_num_layers,
     )
 
     # data module configs
