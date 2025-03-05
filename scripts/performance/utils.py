@@ -198,6 +198,7 @@ def set_primary_perf_configs(
     vp_size: int,
     ep_size: int,
     etp_size: Optional[int] = None,
+    use_mcore_fsdp: bool = False,
 ):
     """Set experiment configs we usually tune for performance of all models."""
     # nemo.lightning.Trainer configs
@@ -218,6 +219,14 @@ def set_primary_perf_configs(
     recipe.trainer.strategy.expert_tensor_parallel_size = etp_size
 
     recipe.trainer.strategy.sequence_parallel = bool(tp_size > 1)
+
+    if use_mcore_fsdp:
+        recipe.model.config.init_model_with_meta_device = True                                 
+        recipe.trainer.strategy.ddp.use_custom_fsdp = True                    
+        recipe.trainer.strategy.ddp.data_parallel_sharding_strategy = "optim_grads_params" 
+        recipe.trainer.strategy.ddp.average_in_collective = False                
+        recipe.trainer.strategy.ddp.keep_fp8_transpose_cache_when_using_custom_fsdp = True
+        recipe.model.config.gradient_accumulation_fusion = False
 
     # callback configs
     comm_overlap_callback_idx = get_comm_overlap_callback_idx(recipe.trainer.callbacks)

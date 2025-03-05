@@ -262,4 +262,13 @@ def parse_cli_args():
         default=[],
     )
 
+    parser.add_argument(
+        "-fsdp",
+        "--use_mcore_fsdp",
+        help="Use mcore FSDP. Disabled by default",
+        action="store_true",
+        required=False,
+        default=False,
+    )
+
     return parser

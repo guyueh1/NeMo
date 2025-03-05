@@ -58,6 +58,7 @@ def override_recipe_configs(
         cp_size,
         vp_size,
         ep_size,
+        use_mcore_fsdp=args.use_mcore_fsdp,
     )
 
     # data module configs
