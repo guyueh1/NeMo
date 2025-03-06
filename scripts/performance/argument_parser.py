@@ -253,7 +253,7 @@ def parse_cli_args():
         "-cg",
         "--cuda_graphs",
         help="Enable CUDA graphs. Disabled by default",
-        action="store_true",
+        type=int,
         required=False,
         default=None,  # NOTE: DO NOT SET DEFAULT TO FALSE, IT WILL BE OVERRIDDEN BY THE RECOMMENDED MODEL CONFIGS
     )
@@ -275,11 +275,13 @@ def parse_cli_args():
         help="Enable cpu offloading. Disabled by default",
         action="store_true",
         required=False,
+        default=False,
     )
 
     parser.add_argument(
         "--cpu_offloading_num_layers",
         type=int,
+        default=0,
         help="Number of layers to offload to CPU. Defaults to 0",
         required=False,
     )
