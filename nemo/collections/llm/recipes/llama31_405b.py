@@ -346,6 +346,9 @@ def finetune_recipe(
     if performance_mode:
         recipe = finetune_performance_optimizations(recipe, peft_scheme)
 
+    recipe.trainer.strategy.account_for_embedding_in_pipeline_split = True
+    recipe.trainer.strategy.account_for_loss_in_pipeline_split = True
+
     return recipe
 
 
