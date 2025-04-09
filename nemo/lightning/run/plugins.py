@@ -374,7 +374,7 @@ class PerfEnvPlugin(run.Plugin):
             tp_size = task.trainer.strategy.tensor_model_parallel_size
             cp_size = task.trainer.strategy.context_parallel_size
             if tp_size > 1 or cp_size > 1:
-                executor.env_vars["CUDA_DEVICE_MAX_CONNECTIONS"] = "1"
+                executor.env_vars["CUDA_DEVICE_MAX_CONNECTIONS"] = "32"
 
             # Set LayerNorm SM margin to support the overlap with LayerNorm kernel
             if self.enable_layernorm_sm_margin:
