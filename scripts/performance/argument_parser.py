@@ -84,7 +84,7 @@ def parse_cli_args():
         "-fr",
         "--fp8_recipe",
         type=str,
-        choices=["ds", "cs", "mxfp8"],
+        choices=["ds", "cs", "mxfp8", "ss"],
         help=fp8_recipe_msg,
         required=False,
         default="ds",
