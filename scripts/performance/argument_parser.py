@@ -370,5 +370,13 @@ def parse_cli_args():
         action="store_true",
         required=False,
     )
+    parser.add_argument(
+        "-ndo",
+        "--num_distributed_optimizer_instances",
+        type=int,
+        help="Number of distributed optimizer instances. Defaults to 1",
+        required=False,
+        default=1,
+    )
 
     return parser
