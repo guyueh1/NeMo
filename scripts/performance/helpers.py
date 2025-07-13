@@ -154,6 +154,7 @@ def set_mcore_fsdp_configs(recipe, comm_overlap_callback_idx: int | None, tp_siz
         recipe.trainer.strategy.ddp.average_in_collective = False
     recipe.trainer.strategy.ddp.keep_fp8_transpose_cache_when_using_custom_fsdp = False
     recipe.model.config.gradient_accumulation_fusion = False
+    recipe.trainer.strategy.ddp.fsdp_double_buffer = True
     if (
         comm_overlap_callback_idx is not None
         and recipe.trainer.callbacks[comm_overlap_callback_idx].defer_embedding_wgrad_compute
@@ -275,9 +276,6 @@ def set_perf_optimization_configs(
     # enable cross entropy fusion with TE kernel
     recipe.model.config.cross_entropy_fusion_impl = "te"
 
-    if use_mcore_fsdp and enable_cuda_graphs:
-        logging.warning("Currently, cuda graphs are not supported with FSDP. Disabling cuda graphs.")
-        enable_cuda_graphs = False
     recipe = set_cuda_graph_configs(recipe, enable_cuda_graphs, task)
 
     if use_mcore_fsdp:
