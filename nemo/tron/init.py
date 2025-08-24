@@ -370,8 +370,8 @@ def set_jit_fusion_options(model_config: GPTConfig | T5Config, micro_batch_size:
 
 def _warmup_jit_function(model_config: GPTConfig | T5Config, micro_batch_size: int):
     """Compilie JIT functions before the main training steps"""
-    if model_config.fp8:
-        dtype = torch.float8
+    if model_config.bf16:
+        dtype = torch.bfloat16
     elif model_config.fp16:
         dtype = torch.float16
     else:
